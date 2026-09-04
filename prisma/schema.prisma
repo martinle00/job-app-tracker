@@ -14,8 +14,14 @@ datasource db {
   provider  = "postgresql"
   // Pooled connection for the app; migrations need a direct one, since a
   // transaction-mode pooler cannot hold the session state they require.
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  //
+  // Named APP_* rather than DATABASE_URL/DIRECT_URL to stay clearly distinct
+  // from the dozen POSTGRES_* and SUPABASE_* variables Vercel's Supabase
+  // integration injects, none of which this app reads. The username in both
+  // must be the tenant-qualified `postgres.[ref]`; a bare `postgres` cannot
+  // authenticate against the pooler.
+  url       = env("APP_DATABASE_URL")
+  directUrl = env("APP_DIRECT_URL")
 }
 
 model Person {

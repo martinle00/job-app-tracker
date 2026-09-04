@@ -10,16 +10,26 @@ Next.js 15 (App Router) · Prisma · Tailwind · Postgres (Supabase)
 
 ```bash
 npm install
-cp .env.example .env          # then fill in DATABASE_URL and DIRECT_URL
+cp .env.example .env          # then fill in APP_DATABASE_URL and APP_DIRECT_URL
 npx prisma migrate deploy     # apply migrations to your database
 npm run db:seed               # load the anonymised sample fixture
 npm run dev
 ```
 
-Both connection strings are required. `DATABASE_URL` is the transaction-mode
+Both connection strings are required. `APP_DATABASE_URL` is the transaction-mode
 pooler (port 6543) the app uses at runtime and **must** carry `?pgbouncer=true`;
-`DIRECT_URL` is the session-mode pooler (port 5432) that migrations need. In
+`APP_DIRECT_URL` is the session-mode pooler (port 5432) that migrations need. In
 Supabase both are under **Connect → ORMs → Prisma**.
+
+They carry the `APP_` prefix to stay clearly distinct from the dozen
+`POSTGRES_*` and `SUPABASE_*` variables Vercel's Supabase integration injects,
+none of which this app reads.
+
+The username in both must be the tenant-qualified `postgres.[ref]`. A bare
+`postgres` — which is what Supabase's *Direct connection* tab shows — cannot
+authenticate against the pooler, and fails with "Authentication failed against
+database server". On Vercel, avoid marking these **Sensitive**: sensitive values
+cannot be read back, so a mistyped string can't be diagnosed afterwards.
 
 Then open http://localhost:3000.
 
@@ -90,7 +100,7 @@ that way, and dates are stored at UTC midnight and formatted in UTC, so a bare
 There is no authentication. Anyone who can reach the app can read, edit and
 delete every row — worth knowing before putting it anywhere public.
 
-Deployed on Vercel. Set `DATABASE_URL` and `DIRECT_URL` in the project's
+Deployed on Vercel. Set `APP_DATABASE_URL` and `APP_DIRECT_URL` in the project's
 environment variables; `npm run build` already runs `prisma generate`. Schema
 changes are applied by running `npx prisma migrate deploy` locally against the
 production database, deliberately rather than during the build, so preview
