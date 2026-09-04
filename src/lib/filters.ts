@@ -4,8 +4,8 @@ import { parseDate } from './validation';
 
 /**
  * Filter state lives entirely in the URL, so the table and the chart read the
- * same source and a filtered view is a shareable link. `FilterBar` is the only
- * component that writes it.
+ * same source and a filtered view is a shareable link. `FilterSidebar` is the
+ * only component that writes it.
  */
 export interface Filters {
   people: string[];

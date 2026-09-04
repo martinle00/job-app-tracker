@@ -159,8 +159,8 @@ describe('parseSheet', () => {
     expect(result.records).toHaveLength(11);
 
     const accc = result.records[0];
-    expect(accc.personDisplayName).toBe('Nushan');
-    expect(accc.company).toBe('ACCC');
+    expect(accc.personDisplayName).toBe('Ada');
+    expect(accc.company).toBe('Acme Bureau');
     expect(accc.furthestStage).toBe('INTERVIEW_1');
     expect(accc.outcome).toBe('REJECTED');
     // 08/04/2025 is day-first: 8 April, not 4 August.
@@ -175,7 +175,7 @@ describe('parseSheet', () => {
   });
 
   it('keeps the closing date where the sheet has one', () => {
-    const ato = parseSheet(SAMPLE).records.find((r) => r.company === 'ATO');
+    const ato = parseSheet(SAMPLE).records.find((r) => r.company === 'Contoso Revenue');
     expect(ato?.closingDate?.toISOString().slice(0, 10)).toBe('2026-09-17');
   });
 
@@ -188,11 +188,11 @@ describe('parseSheet', () => {
   });
 
   it('normalises person names so casing and spacing do not split a person in two', () => {
-    const csv = 'Person,Company,Role Title,Application Date,Response\n  nushan   K ,Canva,Dev,01/02/2026,Nothing Yet\n';
+    const csv = 'Person,Company,Role Title,Application Date,Response\n  ada   K ,Canva,Dev,01/02/2026,Nothing Yet\n';
     const [record] = parseSheet(csv).records;
 
-    expect(record.personName).toBe('nushan k');
-    expect(record.personDisplayName).toBe('nushan K');
+    expect(record.personName).toBe('ada k');
+    expect(record.personDisplayName).toBe('ada K');
   });
 
   it('reports missing columns instead of importing a partial row', () => {
@@ -206,8 +206,8 @@ describe('parseSheet', () => {
   it('collects unmapped values for the maintainer instead of dropping them silently', () => {
     const csv =
       'Person,Company,Role Title,Application Date,Response\n' +
-      'Nushan,Canva,Dev,01/02/2026,Coffee chat\n' +
-      'Nushan,Figma,Dev,02/02/2026,Nothing Yet\n';
+      'Ada,Canva,Dev,01/02/2026,Coffee chat\n' +
+      'Ada,Figma,Dev,02/02/2026,Nothing Yet\n';
     const result = parseSheet(csv);
 
     expect(result.records).toHaveLength(1);
@@ -216,7 +216,7 @@ describe('parseSheet', () => {
   });
 
   it('reports an unreadable date rather than importing the row', () => {
-    const csv = 'Person,Company,Role Title,Application Date,Response\nNushan,Canva,Dev,sometime,Nothing Yet\n';
+    const csv = 'Person,Company,Role Title,Application Date,Response\nAda,Canva,Dev,sometime,Nothing Yet\n';
     const result = parseSheet(csv);
 
     expect(result.records).toEqual([]);
@@ -224,7 +224,7 @@ describe('parseSheet', () => {
   });
 
   it('flags a row that claims progress but has no application date', () => {
-    const csv = 'Person,Company,Role Title,Application Date,Response\nNushan,Canva,Dev,,Positive Email\n';
+    const csv = 'Person,Company,Role Title,Application Date,Response\nAda,Canva,Dev,,Positive Email\n';
     const result = parseSheet(csv);
 
     expect(result.records).toEqual([]);
@@ -233,7 +233,7 @@ describe('parseSheet', () => {
 
   it('flags a row marked not-yet-applied that already has an application date', () => {
     const csv =
-      'Person,Company,Role Title,Application Date,Response\nNushan,Canva,Dev,01/02/2026,Not yet applied\n';
+      'Person,Company,Role Title,Application Date,Response\nAda,Canva,Dev,01/02/2026,Not yet applied\n';
     const result = parseSheet(csv);
 
     expect(result.records).toEqual([]);
@@ -243,7 +243,7 @@ describe('parseSheet', () => {
   it('skips the sheet\'s trailing empty rows without reporting them', () => {
     const csv =
       'Person,Company,Role Title,Application Date,Response\n' +
-      'Nushan,Canva,Dev,01/02/2026,Nothing Yet\n' +
+      'Ada,Canva,Dev,01/02/2026,Nothing Yet\n' +
       ',,,,\n,,,,\n';
     const result = parseSheet(csv);
 

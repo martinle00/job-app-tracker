@@ -1,68 +1,97 @@
-# Redesign patch for job-app-tracker
+# Job Application Tracker
 
-The UI redesign from the design session, written as real source for this app:
-Next.js App Router + Tailwind + Prisma, following the conventions already in the
-repo (URL-driven filters, server actions, `src/lib/stages.ts` as the single
-source of truth for the vocabulary).
+Tracks job applications across several people, as a sortable table and as a
+funnel showing where applications drop out. The data mirrors a Google Sheet,
+which stays the source of truth — the app reads a CSV export of it.
 
-Paths mirror the repo, so applying it is a copy over the top:
+Next.js 15 (App Router) · Prisma · Tailwind · Postgres (Supabase)
+
+## Getting started
 
 ```bash
-cp -R codebase-patch/src        job-app-tracker/
-cp -R codebase-patch/prisma     job-app-tracker/
-cp    codebase-patch/tailwind.config.ts job-app-tracker/
-cd job-app-tracker
-npx prisma migrate dev          # picks up the new migration
-npm run typecheck && npm run test && npm run dev
+npm install
+cp .env.example .env          # then fill in DATABASE_URL and DIRECT_URL
+npx prisma migrate deploy     # apply migrations to your database
+npm run db:seed               # load the anonymised sample fixture
+npm run dev
 ```
 
-Nothing new to install — it uses the deps already in `package.json`
-(`@nivo/sankey`, `@tanstack/react-table`, `zod`).
+Both connection strings are required. `DATABASE_URL` is the transaction-mode
+pooler (port 6543) the app uses at runtime and **must** carry `?pgbouncer=true`;
+`DIRECT_URL` is the session-mode pooler (port 5432) that migrations need. In
+Supabase both are under **Connect → ORMs → Prisma**.
 
-## What changed
+Then open http://localhost:3000.
 
-| File | Change |
+## Scripts
+
+| Script | What it does |
 |---|---|
-| `tailwind.config.ts` | Warm palette + type scale as named theme tokens. |
-| `src/app/globals.css` | Font faces, `--accent` variable, Sankey label halo. |
-| `src/app/layout.tsx` | Two-pane shell; reads the stored accent into `--accent`. |
-| `src/components/AppShell.tsx` | **New.** Collapsible sidebar that holds nav + filters. |
-| `src/components/FilterSidebar.tsx` | **Replaces `FilterBar.tsx`** — same URL contract, sidebar layout. Delete `FilterBar.tsx`. |
-| `src/components/NavLinks.tsx` | Table / Funnel / Settings. Settings drops the filter query. |
-| `src/components/PageHeader.tsx` | **New.** Title, scope, URL-backed search (debounced), action slot. |
-| `src/components/ApplicationTable.tsx` | Five columns + closing-date urgency chip, progress track, quick-advance; row click opens the drawer. |
-| `src/components/ApplicationDrawer.tsx` | **New.** The dropped columns, activity list, advance/edit. |
-| `src/components/ApplicationsView.tsx` | Owns drawer + dialog + header action. |
-| `src/components/ApplicationForm.tsx` | Light dialog: six fields, the rest behind a disclosure. |
-| `src/components/SankeyChart.tsx` | Warm ramp, node click drills into the table, conversion in the tooltip. |
-| `src/components/StatusBadge.tsx` | Warm status tones. |
-| `src/components/SettingsView.tsx` | **New.** Alias, dot colour, accent. |
-| `src/app/settings/page.tsx` | **New.** |
-| `src/app/applications/page.tsx` | Triage tiles (live / no reply in 14 days / closing this week / offers). |
-| `src/app/sankey/page.tsx` | Re-toned tiles, legend and copy. |
-| `src/lib/urgency.ts` | **New.** Closing-date urgency + UTC-safe day formatting. |
-| `src/lib/settings.ts` | **New.** Accent get/set, validated against the offered list. |
-| `src/lib/chart-colors.ts` | Clay ordinal ramp; person + accent choice lists. |
-| `src/lib/queries.ts` | Person `color` on every row and filter option. |
-| `src/app/actions.ts` | `advanceStage`, `updatePerson`, `updateAccent`. |
-| `prisma/schema.prisma` + migration | `Person.color`, `Setting` key/value table. |
+| `npm run dev` | Development server |
+| `npm run build` | `prisma generate` then a production build |
+| `npm run start` | Serve the production build |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run test` | Vitest suite |
+| `npm run import -- <path>` | Import a CSV export of the sheet |
+| `npm run db:seed` | Import the sample fixture |
+| `npm run db:migrate` | `prisma migrate dev` |
+| `npm run db:reset` | Drop and recreate the database |
 
-## Decisions worth knowing
+## Importing from the sheet
 
-- **`advanceStage` never touches the outcome.** Reaching a rung is not an
-  ending; endings stay an explicit choice in the form. It stamps
-  `lastActivity`, which is what makes a row stop reading as stale.
-- **Renaming a person only writes `displayName`.** The normalised `name` is the
-  identity and part of the import key, so a rename cannot fork rows or break a
-  re-import.
-- **The activity list does not invent dates.** The schema stores one
-  `furthestStage`, not an event log, so passed rungs are listed as "reached"
-  and only `appliedDate` / `lastActivity` / `closingDate` carry dates. If you
-  want a dated timeline, that needs an `ApplicationEvent` table — say so and
-  it's a small follow-up.
-- **The accent is a shared setting, not per-user**, matching the app's "no
-  accounts, everyone sees everything" model. "Which person am I" is the one
-  genuinely local preference, so it lives in `localStorage`.
-- **Files to delete after applying:** `src/components/FilterBar.tsx`.
-- **Tests:** `test/filters.test.ts`, `sankey.test.ts` and `parse-sheet.test.ts`
-  are untouched and should still pass — none of the lib contracts changed.
+Export the sheet as CSV, then:
+
+```bash
+npm run import -- data/job_app.csv
+```
+
+The importer is idempotent. It keys rows on `(person, company, role)` and
+deliberately excludes the applied date, so a shortlisted role that later gets
+sent updates in place rather than forking into a duplicate. Re-running it after
+the sheet grows a few rows adds only those rows.
+
+It never guesses. A `Response`, `Stage`, `Offer` or `Accepted` value it does not
+recognise is reported and the row is skipped, and the script exits non-zero so a
+mapping gap can't pass unnoticed. When that happens, add the new value to
+`RESPONSE_MAP`, `STAGE_MAP` or `YES_NO_MAP` in `scripts/column-map.ts`.
+
+Real exports are gitignored (`data/*.csv`) — they contain personal data. The
+fixture in `test/fixtures/sample.csv` is anonymised and committed deliberately.
+
+## How it's put together
+
+| Path | Role |
+|---|---|
+| `src/lib/stages.ts` | Single source of truth for the stage and outcome vocabulary |
+| `src/lib/validation.ts` | Zod schemas every write path goes through |
+| `src/lib/filters.ts` | Filter state, parsed from and written to the URL |
+| `src/lib/queries.ts` | Read queries; serialises dates at the client boundary |
+| `src/app/actions.ts` | Server actions — the only writers |
+| `scripts/column-map.ts` | Everything that knows the shape of the exported sheet |
+
+Two conventions worth knowing before changing things:
+
+- **Filter state lives in the URL**, so the table and the funnel always agree and
+  a filtered view is a shareable link. `FilterSidebar` is the only component that
+  writes it.
+- **Stage and outcome are plain strings**, not database enums. Their permitted
+  values are enforced by Zod rather than the database, so validation belongs in
+  `src/lib/validation.ts` and the sheet's vocabulary can grow without a
+  migration.
+
+## Dates
+
+The sheet is written day-first (`29/8/2026` is 29 August). The parser reads it
+that way, and dates are stored at UTC midnight and formatted in UTC, so a bare
+`08/04/2025` is 8 April and never drifts by a day across timezones.
+
+## Deployment
+
+There is no authentication. Anyone who can reach the app can read, edit and
+delete every row — worth knowing before putting it anywhere public.
+
+Deployed on Vercel. Set `DATABASE_URL` and `DIRECT_URL` in the project's
+environment variables; `npm run build` already runs `prisma generate`. Schema
+changes are applied by running `npx prisma migrate deploy` locally against the
+production database, deliberately rather than during the build, so preview
+deployments never mutate production schema.

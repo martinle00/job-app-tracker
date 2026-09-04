@@ -1,17 +1,21 @@
 // Job application tracker schema.
 //
-// `furthestStage` and `outcome` are plain strings because SQLite has no native
-// enum support in Prisma. Their permitted values live in src/lib/stages.ts and
-// are enforced by the Zod schemas in src/lib/validation.ts, which every write
-// path (form action and CSV importer) goes through.
+// `furthestStage` and `outcome` are plain strings rather than database enums.
+// Their permitted values live in src/lib/stages.ts and are enforced by the Zod
+// schemas in src/lib/validation.ts, which every write path (form action and CSV
+// importer) goes through. Keeping them as strings means the sheet's vocabulary
+// can grow without a migration.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Pooled connection for the app; migrations need a direct one, since a
+  // transaction-mode pooler cannot hold the session state they require.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Person {
