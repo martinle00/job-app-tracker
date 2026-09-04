@@ -5,12 +5,40 @@ import { parseSheet } from '../scripts/parse-sheet';
 
 const SAMPLE = readFileSync(new URL('./fixtures/sample.csv', import.meta.url), 'utf8');
 
-describe('resolveColumns', () => {
-  it('matches headers regardless of case, spacing and punctuation', () => {
-    const columns = resolveColumns(['  Date Applied ', 'company', 'JOB-TITLE', 'Who']);
+/** The sheet's own header names, so the mapping is tested against reality. */
+const SHEET_COLUMNS = {
+  person: 'Person',
+  company: 'Company',
+  role: 'Role Title',
+  appliedDate: 'Application Date',
+  closingDate: 'Closing Date',
+  response: 'Response',
+  stage: 'Stage',
+  offer: 'Offer',
+  accepted: 'Accepted',
+};
 
-    expect(columns.appliedDate).toBe('  Date Applied ');
-    expect(columns.company).toBe('company');
+describe('resolveColumns', () => {
+  it('maps the sheet headers as written', () => {
+    const columns = resolveColumns([
+      'Person',
+      'Company',
+      'Role Title',
+      'Application Date',
+      'Closing Date',
+      'Response',
+      'Stage',
+      'Offer',
+      'Accepted',
+    ]);
+
+    expect(columns).toEqual(SHEET_COLUMNS);
+  });
+
+  it('matches headers regardless of case, spacing and punctuation', () => {
+    const columns = resolveColumns(['  application date ', 'company', 'JOB-TITLE', 'Who']);
+
+    expect(columns.appliedDate).toBe('  application date ');
     expect(columns.role).toBe('JOB-TITLE');
     expect(columns.person).toBe('Who');
   });
@@ -21,30 +49,80 @@ describe('resolveColumns', () => {
 });
 
 describe('resolveStageAndOutcome', () => {
-  const statusColumns = { status: 'Status' };
+  const resolve = (row: Record<string, string>) => resolveStageAndOutcome(row, SHEET_COLUMNS);
 
-  it('maps free-text statuses onto the ladder', () => {
-    expect(resolveStageAndOutcome({ Status: 'Phone Screen' }, statusColumns)).toEqual({
-      furthestStage: 'SCREEN',
+  it('treats "Nothing Yet" as applied and still open', () => {
+    expect(resolve({ Response: 'Nothing Yet' })).toEqual({
+      furthestStage: 'APPLIED',
       outcome: 'IN_PROGRESS',
     });
-    expect(resolveStageAndOutcome({ Status: 'Offer Accepted' }, statusColumns)).toEqual({
+  });
+
+  it('treats a positive response as a rung reached', () => {
+    expect(resolve({ Response: 'Positive Email' })).toEqual({
+      furthestStage: 'RESPONSE',
+      outcome: 'IN_PROGRESS',
+    });
+    expect(resolve({ Response: 'Positive Phone Call', Stage: 'Waiting' })).toEqual({
+      furthestStage: 'RESPONSE',
+      outcome: 'IN_PROGRESS',
+    });
+  });
+
+  it('reads an interview round from the Stage column', () => {
+    expect(resolve({ Response: 'Positive Email', Stage: '1st Face-to-face' })).toEqual({
+      furthestStage: 'INTERVIEW',
+      outcome: 'IN_PROGRESS',
+    });
+  });
+
+  it('reads "Offer: No" as a rejection at the furthest stage reached', () => {
+    expect(resolve({ Response: 'Positive Email', Stage: '1st Face-to-face', Offer: 'No' })).toEqual({
+      furthestStage: 'INTERVIEW',
+      outcome: 'REJECTED',
+    });
+  });
+
+  it('reads "Offer: Yes" as reaching the offer rung, still undecided', () => {
+    expect(resolve({ Response: 'Positive Email', Offer: 'Yes' })).toEqual({
+      furthestStage: 'OFFER',
+      outcome: 'IN_PROGRESS',
+    });
+  });
+
+  it('lets the Accepted column settle the outcome', () => {
+    expect(resolve({ Response: 'Positive Email', Offer: 'Yes', Accepted: 'Yes' })).toEqual({
       furthestStage: 'OFFER',
       outcome: 'ACCEPTED',
+    });
+    expect(resolve({ Response: 'Positive Email', Offer: 'Yes', Accepted: 'No' })).toEqual({
+      furthestStage: 'OFFER',
+      outcome: 'DECLINED',
+    });
+  });
+
+  it('holds "Not yet applied" at the start of the funnel', () => {
+    expect(resolve({ Response: 'Not yet applied' })).toEqual({
+      furthestStage: 'APPLIED',
+      outcome: 'NOT_APPLIED',
+    });
+  });
+
+  it('does not let a stray later column promote a row nobody has applied to', () => {
+    expect(resolve({ Response: 'Not yet applied', Stage: '1st Face-to-face', Offer: 'Yes' })).toEqual({
+      furthestStage: 'APPLIED',
+      outcome: 'NOT_APPLIED',
     });
   });
 
   it('returns null for wording it does not know, rather than defaulting', () => {
-    expect(resolveStageAndOutcome({ Status: 'Coffee chat' }, statusColumns)).toBeNull();
-    expect(resolveStageAndOutcome({ Status: '' }, statusColumns)).toBeNull();
+    expect(resolve({ Response: 'Coffee chat' })).toBeNull();
+    expect(resolve({ Response: 'Nothing Yet', Stage: 'Hackathon' })).toBeNull();
+    expect(resolve({ Response: 'Nothing Yet', Offer: 'Maybe' })).toBeNull();
   });
 
-  it('prefers explicit stage and outcome columns when the sheet has both', () => {
-    const columns = { stage: 'Stage', outcome: 'Outcome' };
-    expect(resolveStageAndOutcome({ Stage: 'Final round', Outcome: 'Rejected' }, columns)).toEqual({
-      furthestStage: 'FINAL',
-      outcome: 'REJECTED',
-    });
+  it('treats a blank row as applied and open, since the sheet leaves them empty', () => {
+    expect(resolve({})).toEqual({ furthestStage: 'APPLIED', outcome: 'IN_PROGRESS' });
   });
 });
 
@@ -54,74 +132,95 @@ describe('parseSheet', () => {
 
     expect(result.missingColumns).toEqual([]);
     expect(result.errors).toEqual([]);
-    expect(result.records).toHaveLength(15);
+    expect(result.records).toHaveLength(11);
 
-    const first = result.records[0];
-    expect(first.personDisplayName).toBe('Alex Chen');
-    expect(first.company).toBe('Atlassian');
-    expect(first.appliedDate.toISOString().slice(0, 10)).toBe('2025-01-14');
-    expect(first.furthestStage).toBe('APPLIED');
-    expect(first.outcome).toBe('REJECTED');
+    const accc = result.records[0];
+    expect(accc.personDisplayName).toBe('Nushan');
+    expect(accc.company).toBe('ACCC');
+    expect(accc.furthestStage).toBe('INTERVIEW');
+    expect(accc.outcome).toBe('REJECTED');
+    // 08/04/2025 is day-first: 8 April, not 4 August.
+    expect(accc.appliedDate?.toISOString().slice(0, 10)).toBe('2025-04-08');
+  });
+
+  it('leaves shortlisted rows without an applied date', () => {
+    const shortlisted = parseSheet(SAMPLE).records.filter((r) => r.outcome === 'NOT_APPLIED');
+
+    expect(shortlisted).toHaveLength(3);
+    expect(shortlisted.every((r) => r.appliedDate === undefined)).toBe(true);
+  });
+
+  it('keeps the closing date where the sheet has one', () => {
+    const ato = parseSheet(SAMPLE).records.find((r) => r.company === 'ATO');
+    expect(ato?.closingDate?.toISOString().slice(0, 10)).toBe('2026-09-17');
+  });
+
+  it('reads dates day-first, including single-digit months', () => {
+    const tfnsw = parseSheet(SAMPLE).records.find(
+      (r) => r.role === 'Project Performance Reporting Analyst',
+    );
+    // "29/8/2026"
+    expect(tfnsw?.appliedDate?.toISOString().slice(0, 10)).toBe('2026-08-29');
   });
 
   it('normalises person names so casing and spacing do not split a person in two', () => {
-    const csv = 'Name,Company,Role,Date Applied,Status\n  alex   CHEN ,Canva,Dev,2025-01-01,Applied\n';
+    const csv = 'Person,Company,Role Title,Application Date,Response\n  nushan   K ,Canva,Dev,01/02/2026,Nothing Yet\n';
     const [record] = parseSheet(csv).records;
 
-    expect(record.personName).toBe('alex chen');
-    expect(record.personDisplayName).toBe('alex CHEN');
+    expect(record.personName).toBe('nushan k');
+    expect(record.personDisplayName).toBe('nushan K');
   });
 
   it('reports missing columns instead of importing a partial row', () => {
-    const result = parseSheet('Company,Role\nCanva,Dev\n');
+    const result = parseSheet('Company,Role Title\nCanva,Dev\n');
 
     expect(result.records).toEqual([]);
     expect(result.missingColumns).toContain('person');
-    expect(result.missingColumns).toContain('appliedDate');
-    expect(result.missingColumns).toContain('status');
+    expect(result.missingColumns).toContain('response');
   });
 
-  it('collects unmapped statuses for the maintainer instead of dropping them silently', () => {
+  it('collects unmapped values for the maintainer instead of dropping them silently', () => {
     const csv =
-      'Name,Company,Role,Date Applied,Status\n' +
-      'Alex,Canva,Dev,2025-01-01,Coffee chat\n' +
-      'Alex,Figma,Dev,2025-01-02,Applied\n';
+      'Person,Company,Role Title,Application Date,Response\n' +
+      'Nushan,Canva,Dev,01/02/2026,Coffee chat\n' +
+      'Nushan,Figma,Dev,02/02/2026,Nothing Yet\n';
     const result = parseSheet(csv);
 
     expect(result.records).toHaveLength(1);
-    expect(result.unmappedStatuses).toEqual(['Coffee chat']);
+    expect(result.unmappedStatuses).toEqual(['Response=Coffee chat']);
     expect(result.errors[0].row).toBe(2);
   });
 
-  it('accepts the date formats a spreadsheet export tends to produce', () => {
-    const csv =
-      'Name,Company,Role,Date Applied,Status\n' +
-      'Alex,A,Dev,14/03/2025,Applied\n' +
-      'Alex,B,Dev,2025-03-14,Applied\n';
-    const dates = parseSheet(csv).records.map((r) => r.appliedDate.toISOString().slice(0, 10));
-
-    expect(dates).toEqual(['2025-03-14', '2025-03-14']);
-  });
-
   it('reports an unreadable date rather than importing the row', () => {
-    const csv = 'Name,Company,Role,Date Applied,Status\nAlex,Canva,Dev,sometime,Applied\n';
+    const csv = 'Person,Company,Role Title,Application Date,Response\nNushan,Canva,Dev,sometime,Nothing Yet\n';
     const result = parseSheet(csv);
 
     expect(result.records).toEqual([]);
-    expect(result.errors[0].reason).toContain('Unreadable applied date');
+    expect(result.errors[0].reason).toContain('Unreadable appliedDate date');
   });
 
-  it('rejects an outcome that could not have happened at that stage', () => {
+  it('flags a row that claims progress but has no application date', () => {
+    const csv = 'Person,Company,Role Title,Application Date,Response\nNushan,Canva,Dev,,Positive Email\n';
+    const result = parseSheet(csv);
+
+    expect(result.records).toEqual([]);
+    expect(result.errors[0].reason).toContain('no application date');
+  });
+
+  it('flags a row marked not-yet-applied that already has an application date', () => {
     const csv =
-      'Name,Company,Role,Date Applied,Stage,Outcome\nAlex,Canva,Dev,2025-01-01,Interview,Accepted\n';
+      'Person,Company,Role Title,Application Date,Response\nNushan,Canva,Dev,01/02/2026,Not yet applied\n';
     const result = parseSheet(csv);
 
     expect(result.records).toEqual([]);
-    expect(result.errors[0].reason).toContain('not reachable');
+    expect(result.errors[0].reason).toContain('has an application date');
   });
 
-  it('skips trailing blank rows without reporting them', () => {
-    const csv = 'Name,Company,Role,Date Applied,Status\nAlex,Canva,Dev,2025-01-01,Applied\n,,,,\n';
+  it('skips the sheet\'s trailing empty rows without reporting them', () => {
+    const csv =
+      'Person,Company,Role Title,Application Date,Response\n' +
+      'Nushan,Canva,Dev,01/02/2026,Nothing Yet\n' +
+      ',,,,\n,,,,\n';
     const result = parseSheet(csv);
 
     expect(result.records).toHaveLength(1);

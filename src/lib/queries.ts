@@ -12,17 +12,23 @@ export interface ApplicationRow {
   location: string | null;
   workType: string | null;
   jobUrl: string | null;
-  appliedDate: string;
+  appliedDate: string | null;
+  closingDate: string | null;
   lastActivity: string | null;
   furthestStage: string;
   outcome: string;
   notes: string | null;
 }
 
+function toDay(date: Date | null): string | null {
+  return date ? date.toISOString().slice(0, 10) : null;
+}
+
 export async function getApplications(filters: Filters): Promise<ApplicationRow[]> {
   const rows = await prisma.application.findMany({
     where: toPrismaWhere(filters),
-    orderBy: [{ appliedDate: 'desc' }, { company: 'asc' }],
+    // Nulls last: shortlisted roles sit below everything actually sent.
+    orderBy: [{ appliedDate: { sort: 'desc', nulls: 'last' } }, { company: 'asc' }],
     include: { person: { select: { name: true, displayName: true } } },
   });
 
@@ -36,8 +42,9 @@ export async function getApplications(filters: Filters): Promise<ApplicationRow[
     location: row.location,
     workType: row.workType,
     jobUrl: row.jobUrl,
-    appliedDate: row.appliedDate.toISOString().slice(0, 10),
-    lastActivity: row.lastActivity ? row.lastActivity.toISOString().slice(0, 10) : null,
+    appliedDate: toDay(row.appliedDate),
+    closingDate: toDay(row.closingDate),
+    lastActivity: toDay(row.lastActivity),
     furthestStage: row.furthestStage,
     outcome: row.outcome,
     notes: row.notes,

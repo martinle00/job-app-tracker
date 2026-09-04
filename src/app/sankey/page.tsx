@@ -5,7 +5,7 @@ import { nodeColor } from '@/lib/chart-colors';
 import { parseFilters, type SearchParams } from '@/lib/filters';
 import { getApplications, getFilterOptions } from '@/lib/queries';
 import { buildSankey, outcomeNodeId, type SankeyGraph } from '@/lib/sankey';
-import { OUTCOMES, STAGES, stageIndex } from '@/lib/stages';
+import { OUTCOMES } from '@/lib/stages';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,11 +35,19 @@ export default async function SankeyPage({
         <p className="text-sm text-slate-500">{scope}</p>
       </div>
 
-      <Summary graph={graph} rows={rows} />
+      <Summary graph={graph} />
 
       <SankeyChart graph={graph} />
 
       <Legend graph={graph} />
+
+      {graph.notApplied > 0 && (
+        <p className="mt-3 text-sm text-slate-600">
+          {graph.notApplied} shortlisted {graph.notApplied === 1 ? 'role is' : 'roles are'} not on
+          the funnel yet — nothing has been sent, so counting them as applications would understate
+          every conversion rate. They are in the table.
+        </p>
+      )}
 
       {graph.skipped > 0 && (
         <p className="mt-3 text-sm text-amber-700">
@@ -54,25 +62,26 @@ export default async function SankeyPage({
   );
 }
 
-function Summary({ graph, rows }: { graph: SankeyGraph; rows: { furthestStage: string }[] }) {
-  const interviewIndex = stageIndex('INTERVIEW');
-  const reachedInterview = rows.filter((row) => {
-    const index = STAGES.findIndex((s) => s.id === row.furthestStage);
-    return index >= interviewIndex;
-  }).length;
+function Summary({ graph }: { graph: SankeyGraph }) {
+  // Read straight off the graph so the tiles and the ribbons can never
+  // disagree — the node value is exactly what flows through that rung.
+  const atRung = (stage: string) => graph.nodes.find((n) => n.id === stage)?.value ?? 0;
+  const responded = atRung('RESPONSE');
+  const interviewed = atRung('INTERVIEW');
+  const offers = atRung('OFFER');
 
-  const offers = graph.nodes.find((n) => n.id === 'OFFER')?.value ?? 0;
-  const accepted = graph.nodes.find((n) => n.id === outcomeNodeId('ACCEPTED'))?.value ?? 0;
-
+  // Rates are of applications actually sent; the shortlist is not in the
+  // denominator, or every conversion would read low for no reason.
   const rate = (part: number) =>
     graph.total > 0 ? `${Math.round((part / graph.total) * 100)}%` : '—';
 
   return (
-    <dl className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Stat label="Applications" value={String(graph.total)} />
-      <Stat label="Reached interview" value={String(reachedInterview)} hint={rate(reachedInterview)} />
+    <dl className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <Stat label="Applied" value={String(graph.total)} />
+      <Stat label="Heard back" value={String(responded)} hint={rate(responded)} />
+      <Stat label="Interviewed" value={String(interviewed)} hint={rate(interviewed)} />
       <Stat label="Offers" value={String(offers)} hint={rate(offers)} />
-      <Stat label="Accepted" value={String(accepted)} hint={rate(accepted)} />
+      <Stat label="Not yet applied" value={String(graph.notApplied)} />
     </dl>
   );
 }

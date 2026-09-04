@@ -1,6 +1,7 @@
 import {
   OUTCOMES,
   STAGES,
+  isApplied,
   isOutcomeId,
   isStageId,
   stageIndex,
@@ -30,8 +31,10 @@ export interface SankeyLink {
 export interface SankeyGraph {
   nodes: SankeyNode[];
   links: SankeyLink[];
-  /** Applications that contributed to the graph, i.e. excluding skipped rows. */
+  /** Applications that contributed to the graph, i.e. ones actually sent. */
   total: number;
+  /** Shortlisted roles not applied to yet. Real rows, but not yet a flow. */
+  notApplied: number;
   /** Rows dropped because their stage or outcome was not recognised. */
   skipped: number;
 }
@@ -57,6 +60,7 @@ export function buildSankey(apps: readonly SankeyInput[]): SankeyGraph {
   const linkTotals = new Map<string, number>();
   const nodeTotals = new Map<string, number>();
   let total = 0;
+  let notApplied = 0;
   let skipped = 0;
 
   const addLink = (source: string, target: string) => {
@@ -72,6 +76,14 @@ export function buildSankey(apps: readonly SankeyInput[]): SankeyGraph {
     // Anything we cannot place on the ladder is counted, never guessed at.
     if (!isStageId(app.furthestStage) || !isOutcomeId(app.outcome)) {
       skipped += 1;
+      continue;
+    }
+
+    // A role on the shortlist has not flowed anywhere yet. Counting it as
+    // "Applied" would overstate the top of the funnel and drag every
+    // conversion rate down, so it is held out and reported separately.
+    if (!isApplied(app.outcome)) {
+      notApplied += 1;
       continue;
     }
 
@@ -128,5 +140,5 @@ export function buildSankey(apps: readonly SankeyInput[]): SankeyGraph {
     });
   }
 
-  return { nodes, links, total, skipped };
+  return { nodes, links, total, notApplied, skipped };
 }

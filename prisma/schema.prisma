@@ -33,7 +33,9 @@ model Application {
   location      String?
   workType      String?
   jobUrl        String?
-  appliedDate   DateTime
+  // Null for shortlisted roles that have not been applied to yet.
+  appliedDate   DateTime?
+  closingDate   DateTime?
   lastActivity  DateTime?
   furthestStage String
   outcome       String
@@ -41,7 +43,10 @@ model Application {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  @@unique([personId, company, role, appliedDate], name: "importKey")
+  // One row per person/company/role, matching one row per role in the sheet.
+  // Deliberately excludes appliedDate: a shortlisted row gains one when it is
+  // actually sent, and re-importing must update that row rather than fork it.
+  @@unique([personId, company, role], name: "importKey")
   @@index([personId])
   @@index([appliedDate])
 }

@@ -31,13 +31,27 @@ export function ApplicationTable({ rows, onEdit, onDelete }: Props) {
       columnHelper.accessor('person', { header: 'Person' }),
       columnHelper.accessor('company', { header: 'Company' }),
       columnHelper.accessor('role', { header: 'Role' }),
-      columnHelper.accessor('appliedDate', { header: 'Applied' }),
+      columnHelper.accessor('appliedDate', {
+        header: 'Applied',
+        cell: (info) =>
+          info.getValue() ?? <span className="text-slate-400">not yet</span>,
+      }),
+      columnHelper.accessor('closingDate', {
+        header: 'Closes',
+        cell: (info) => info.getValue() ?? <span className="text-slate-400">—</span>,
+      }),
       columnHelper.accessor('furthestStage', {
         header: 'Furthest stage',
         // Sort by ladder position rather than alphabetically, so the column
         // orders the way the funnel actually runs.
         sortingFn: (a, b) => ladderPosition(a.original.furthestStage) - ladderPosition(b.original.furthestStage),
-        cell: (info) => <StageBadge stage={info.getValue()} />,
+        // A shortlisted row has not entered the funnel, so it has no rung.
+        cell: (info) =>
+          info.row.original.outcome === 'NOT_APPLIED' ? (
+            <span className="text-slate-400">—</span>
+          ) : (
+            <StageBadge stage={info.getValue()} />
+          ),
       }),
       columnHelper.accessor('outcome', {
         header: 'Outcome',

@@ -5,11 +5,11 @@ import { STAGE_IDS, isStageId, stageIndex, type OutcomeId } from './stages';
  *
  * Stage nodes use a single-hue *ordinal* blue ramp — the funnel is an ordered
  * progression, not a set of unrelated categories, so magnitude of progress is
- * encoded by depth of colour. These five steps were checked against the
+ * encoded by depth of colour. These four steps were checked against the
  * ordinal gates (monotone lightness, adjacent-step gaps >= 0.06, light end
  * clearing 2:1 on a white surface).
  */
-const STAGE_RAMP = ['#86b6ef', '#5598e7', '#2a78d6', '#1c5cab', '#104281'];
+const STAGE_RAMP = ['#86b6ef', '#3987e5', '#1c5cab', '#104281'];
 
 /**
  * Outcome nodes are *states*, so they take the reserved status palette rather
@@ -27,9 +27,11 @@ const OUTCOME_COLORS: Record<OutcomeId, string> = {
   IN_PROGRESS: '#4a3aa7', // violet: still live, and clearly not part of the blue ladder
   ACCEPTED: '#0ca30c', // status: good
   REJECTED: '#d03b3b', // status: critical
-  GHOSTED: '#ec835a', // status: serious
   WITHDRAWN: '#6f6d66', // neutral: you ended it
   DECLINED: '#6f6d66', // neutral: you ended it
+  // Never drawn — shortlisted roles are held out of the funnel — but it keeps
+  // the record total and gives the backlog tile a colour to match.
+  NOT_APPLIED: '#a8a69d',
 };
 
 export const OUTCOME_NODE_PREFIX = 'OUTCOME_';

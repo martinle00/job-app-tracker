@@ -21,7 +21,10 @@ export function displayPersonName(raw: string): string {
 }
 
 /**
- * Accepts the handful of date shapes a spreadsheet export tends to produce.
+ * Accepts the date shapes the export produces. Day-first throughout — the sheet
+ * is written DD/MM/YYYY ("29/8/2026"), so a bare 08/04/2025 is 8 April, and
+ * guessing per-row would silently mangle every date before the 13th.
+ *
  * Returns undefined rather than an Invalid Date so callers can report the bad
  * row instead of writing garbage.
  */
@@ -29,16 +32,15 @@ export function parseDate(raw: string): Date | undefined {
   const value = raw.trim();
   if (!value) return undefined;
 
-  // DD/MM/YYYY or DD-MM-YYYY — ambiguous with US order, so it is spelled out
-  // here rather than left to Date's locale-dependent guessing.
-  const dmy = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (dmy) {
-    const [, d, m, y] = dmy;
+  const dayFirst = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dayFirst) {
+    const [, d, m, y] = dayFirst;
+    if (Number(m) > 12 || Number(d) > 31) return undefined;
     const date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
     return Number.isNaN(date.getTime()) ? undefined : date;
   }
 
-  // YYYY-MM-DD and full ISO timestamps.
+  // YYYY-MM-DD and full ISO timestamps, as produced by the date inputs.
   const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) {
     const [, y, m, d] = iso;
@@ -50,19 +52,6 @@ export function parseDate(raw: string): Date | undefined {
   if (Number.isNaN(parsed.getTime())) return undefined;
   return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
 }
-
-const dateFromInput = z
-  .string()
-  .trim()
-  .min(1, 'A date is required')
-  .transform((value, ctx) => {
-    const parsed = parseDate(value);
-    if (!parsed) {
-      ctx.addIssue({ code: 'custom', message: `Unrecognised date: "${value}"` });
-      return z.NEVER;
-    }
-    return parsed;
-  });
 
 const optionalDateFromInput = z
   .string()
@@ -87,7 +76,8 @@ export const applicationInputSchema = z
     location: optionalText,
     workType: z.enum(WORK_TYPES).optional().or(z.literal('')).transform((v) => (v ? v : undefined)),
     jobUrl: trimmed.url('Must be a URL').optional().or(z.literal('')).transform((v) => (v ? v : undefined)),
-    appliedDate: dateFromInput,
+    appliedDate: optionalDateFromInput,
+    closingDate: optionalDateFromInput,
     lastActivity: optionalDateFromInput,
     furthestStage: z.enum(STAGE_IDS as unknown as [StageId, ...StageId[]]),
     outcome: z.enum(OUTCOME_IDS as unknown as [OutcomeId, ...OutcomeId[]]),
@@ -95,13 +85,31 @@ export const applicationInputSchema = z
   })
   .superRefine((value, ctx) => {
     if (!isConsistent(value.furthestStage, value.outcome)) {
+      const message =
+        value.outcome === 'NOT_APPLIED'
+          ? 'A role you have not applied to yet cannot have reached a later stage.'
+          : 'An offer outcome requires the application to have reached the Offer stage.';
+      ctx.addIssue({ code: 'custom', path: ['outcome'], message });
+    }
+
+    // The applied date is what separates a sent application from a shortlisted
+    // one, so the two have to agree.
+    if (value.outcome === 'NOT_APPLIED' && value.appliedDate) {
       ctx.addIssue({
         code: 'custom',
-        path: ['outcome'],
-        message: 'An offer outcome requires the application to have reached the Offer stage.',
+        path: ['appliedDate'],
+        message: 'Remove the applied date, or change the outcome away from "Not yet applied".',
       });
     }
-    if (value.lastActivity && value.lastActivity < value.appliedDate) {
+    if (value.outcome !== 'NOT_APPLIED' && !value.appliedDate) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['appliedDate'],
+        message: 'An applied date is required unless the outcome is "Not yet applied".',
+      });
+    }
+
+    if (value.lastActivity && value.appliedDate && value.lastActivity < value.appliedDate) {
       ctx.addIssue({
         code: 'custom',
         path: ['lastActivity'],

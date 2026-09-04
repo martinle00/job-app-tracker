@@ -23,30 +23,44 @@ describe('buildSankey', () => {
     const graph = buildSankey([app('INTERVIEW', 'REJECTED')]);
 
     expect(graph.links).toEqual([
-      { source: 'APPLIED', target: 'SCREEN', value: 1 },
-      { source: 'SCREEN', target: 'INTERVIEW', value: 1 },
+      { source: 'APPLIED', target: 'RESPONSE', value: 1 },
+      { source: 'RESPONSE', target: 'INTERVIEW', value: 1 },
       { source: 'INTERVIEW', target: outcomeNodeId('REJECTED'), value: 1 },
     ]);
     expect(graph.total).toBe(1);
   });
 
-  it('emits only an exit link when the application never progressed', () => {
-    const graph = buildSankey([app('APPLIED', 'GHOSTED')]);
+  it('emits only an exit link when the application never got a response', () => {
+    const graph = buildSankey([app('APPLIED', 'IN_PROGRESS')]);
 
     expect(graph.links).toEqual([
-      { source: 'APPLIED', target: outcomeNodeId('GHOSTED'), value: 1 },
+      { source: 'APPLIED', target: outcomeNodeId('IN_PROGRESS'), value: 1 },
     ]);
+  });
+
+  it('holds shortlisted roles out of the funnel and counts them separately', () => {
+    const graph = buildSankey([
+      app('APPLIED', 'NOT_APPLIED'),
+      app('APPLIED', 'NOT_APPLIED'),
+      app('OFFER', 'ACCEPTED'),
+    ]);
+
+    // The one real application is the whole funnel; the shortlist is not in it.
+    expect(graph.total).toBe(1);
+    expect(graph.notApplied).toBe(2);
+    expect(graph.nodes.some((node) => node.id === outcomeNodeId('NOT_APPLIED'))).toBe(false);
+    expect(graph.nodes.find((node) => node.id === 'APPLIED')?.value).toBe(1);
   });
 
   it('conserves flow: every stage node passes on everything it receives', () => {
     const graph = buildSankey([
+      app('APPLIED', 'IN_PROGRESS'),
       app('APPLIED', 'REJECTED'),
-      app('APPLIED', 'GHOSTED'),
-      app('SCREEN', 'REJECTED'),
-      app('INTERVIEW', 'IN_PROGRESS'),
-      app('FINAL', 'REJECTED'),
+      app('RESPONSE', 'IN_PROGRESS'),
+      app('INTERVIEW', 'REJECTED'),
       app('OFFER', 'ACCEPTED'),
       app('OFFER', 'DECLINED'),
+      app('APPLIED', 'NOT_APPLIED'),
     ]);
 
     // APPLIED has no inflow, so it is checked against the total instead.
@@ -61,7 +75,7 @@ describe('buildSankey', () => {
   it('every application ends at exactly one outcome node', () => {
     const apps = [
       app('APPLIED', 'REJECTED'),
-      app('SCREEN', 'GHOSTED'),
+      app('RESPONSE', 'WITHDRAWN'),
       app('INTERVIEW', 'IN_PROGRESS'),
       app('OFFER', 'ACCEPTED'),
     ];
@@ -84,26 +98,25 @@ describe('buildSankey', () => {
     const value = (id: string) => graph.nodes.find((node) => node.id === id)?.value;
 
     expect(value('APPLIED')).toBe(3);
-    expect(value('SCREEN')).toBe(2);
+    expect(value('RESPONSE')).toBe(2);
     expect(value('INTERVIEW')).toBe(2);
-    expect(value('FINAL')).toBe(1);
     expect(value('OFFER')).toBe(1);
     expect(value(outcomeNodeId('REJECTED'))).toBe(2);
     expect(value(outcomeNodeId('ACCEPTED'))).toBe(1);
   });
 
   it('omits stages nothing reached, so the layout has no orphan nodes', () => {
-    const graph = buildSankey([app('SCREEN', 'REJECTED')]);
+    const graph = buildSankey([app('RESPONSE', 'REJECTED')]);
 
     expect(graph.nodes.map((node) => node.id)).toEqual([
       'APPLIED',
-      'SCREEN',
+      'RESPONSE',
       outcomeNodeId('REJECTED'),
     ]);
   });
 
   it('never emits a zero-weight link', () => {
-    const graph = buildSankey([app('FINAL', 'IN_PROGRESS'), app('APPLIED', 'REJECTED')]);
+    const graph = buildSankey([app('INTERVIEW', 'IN_PROGRESS'), app('APPLIED', 'REJECTED')]);
     expect(graph.links.every((link) => link.value > 0)).toBe(true);
   });
 

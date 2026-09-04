@@ -1,16 +1,12 @@
-Name,Company,Role,Date Applied,Source,Location,Work Type,Status,Link,Notes
-Alex Chen,Atlassian,Backend Engineer,2025-01-14,LinkedIn,Sydney,hybrid,Rejected,https://example.com/a1,Applied through referral link
-Alex Chen,Canva,Platform Engineer,2025-01-22,Careers page,Sydney,remote,Offer Accepted,https://example.com/a2,
-Alex Chen,Google,SWE II,2025-02-03,LinkedIn,Sydney,onsite,Final round,,Waiting on team match
-Alex Chen,Stripe,Infrastructure Engineer,2025-02-11,Referral,Remote,remote,No response,,
-Alex Chen,Datadog,Backend Engineer,2025-03-02,Seek,Sydney,hybrid,Phone screen,,
-Priya Raman,Canva,Product Designer,2025-01-09,LinkedIn,Sydney,hybrid,Rejected,,
-Priya Raman,Atlassian,Design Systems Lead,2025-01-28,Referral,Sydney,remote,Interview,,Take-home submitted
-Priya Raman,Figma,Product Designer,2025-02-14,Careers page,Remote,remote,Offer Declined,,Compensation too low
-Priya Raman,Airtable,Senior Designer,2025-02-20,Seek,Remote,remote,Withdrawn,,Took another process further
-Priya Raman,Culture Amp,Product Designer,2025-03-05,LinkedIn,Melbourne,hybrid,Applied,,
-Sam Okafor,Google,Data Scientist,2025-01-30,LinkedIn,Sydney,onsite,Ghosted,,
-Sam Okafor,Atlassian,Analytics Engineer,2025-02-06,Careers page,Sydney,hybrid,Rejected after interview,,Failed system design
-Sam Okafor,Canva,Data Scientist,2025-02-19,Referral,Sydney,hybrid,Final round,,
-Sam Okafor,Xero,Data Analyst,2025-03-11,Seek,Melbourne,remote,Recruiter call,,
-Sam Okafor,Zip,Data Scientist,2025-03-18,LinkedIn,Sydney,hybrid,Applied,,
+Person,Company,Role Title,Application Date,Closing Date,Response,Stage,Offer,Accepted
+Nushan,ACCC,2026 Graduate Program,08/04/2025,08/04/2025,Positive Email,1st Face-to-face,No,
+Nushan,NSW Treasury,Associate Economist,04/09/2026,,Nothing Yet,,,
+Nushan,ATO,Business Strategy Officer,03/09/2026,17/09/2026,Nothing Yet,,,
+Nushan,Strategy& (PWC),Junior Strategy Consultant,04/09/2026,,Nothing Yet,,,
+Nushan,AEMC,Policy Advisor,03/09/2026,,Nothing Yet,,,
+Chong the Coder,Westpac,Senior AI Engineer,26/08/2026,,Positive Phone Call,Waiting,,
+Derules,Transport for NSW,Project Performance Reporting Analyst,29/8/2026,,Nothing Yet,Waiting,,
+Derules,Sydney Metro,Project Controls Analyst,02/09/2026,,Nothing Yet,Waiting,,
+Derules,Macquarie Group,Remediation Data Analyst,,,Not yet applied,,,
+Derules,Macquarie Group,Data Management Analyst,,,Not yet applied,,,
+Derules,Transport for NSW,Data Analyst,,,Not yet applied,,,

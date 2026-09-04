@@ -83,12 +83,24 @@ export function ApplicationForm({ application, knownPeople, onClose, onSaved }: 
             <input name="role" defaultValue={application?.role ?? ''} required className={inputClass} />
           </Field>
 
-          <Field label="Applied date" error={fieldError('appliedDate')}>
+          <Field
+            label="Applied date"
+            error={fieldError('appliedDate')}
+            hint='Leave blank only for "Not yet applied".'
+          >
             <input
               type="date"
               name="appliedDate"
               defaultValue={application?.appliedDate ?? ''}
-              required
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Closing date" error={fieldError('closingDate')}>
+            <input
+              type="date"
+              name="closingDate"
+              defaultValue={application?.closingDate ?? ''}
               className={inputClass}
             />
           </Field>

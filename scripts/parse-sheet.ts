@@ -6,11 +6,7 @@
  * coerced into a default — see the note in column-map.ts.
  */
 import Papa from 'papaparse';
-import {
-  displayPersonName,
-  normalisePersonName,
-  parseDate,
-} from '../src/lib/validation';
+import { displayPersonName, normalisePersonName, parseDate } from '../src/lib/validation';
 import { isConsistent, WORK_TYPES, type OutcomeId, type StageId } from '../src/lib/stages';
 import {
   normaliseHeader,
@@ -29,7 +25,8 @@ export interface ParsedApplication {
   location?: string;
   workType?: string;
   jobUrl?: string;
-  appliedDate: Date;
+  appliedDate?: Date;
+  closingDate?: Date;
   lastActivity?: Date;
   furthestStage: StageId;
   outcome: OutcomeId;
@@ -45,14 +42,14 @@ export interface RowError {
 export interface ParseResult {
   records: ParsedApplication[];
   errors: RowError[];
-  /** Distinct status wordings that had no mapping, for updating column-map.ts. */
+  /** Distinct funnel-column wordings that had no mapping, for column-map.ts. */
   unmappedStatuses: string[];
   /** Model fields that no sheet column fed. */
   missingColumns: MappableField[];
   columns: Partial<Record<MappableField, string>>;
 }
 
-const REQUIRED_COLUMNS: MappableField[] = ['person', 'company', 'role', 'appliedDate'];
+const REQUIRED_COLUMNS: MappableField[] = ['person', 'company', 'role'];
 
 function cell(row: Record<string, string>, header: string | undefined): string {
   if (!header) return '';
@@ -70,8 +67,10 @@ export function parseSheet(csvText: string): ParseResult {
   const columns = resolveColumns(headers);
 
   const missingColumns = REQUIRED_COLUMNS.filter((field) => !columns[field]);
-  const hasStatusSource = Boolean(columns.status || (columns.stage && columns.outcome));
-  if (!hasStatusSource) missingColumns.push('status');
+  const hasFunnelColumns = Boolean(
+    columns.response || columns.stage || columns.offer || columns.accepted || columns.status,
+  );
+  if (!hasFunnelColumns) missingColumns.push('response');
 
   const records: ParsedApplication[] = [];
   const errors: RowError[] = [];
@@ -89,7 +88,8 @@ export function parseSheet(csvText: string): ParseResult {
     const company = cell(row, columns.company);
     const role = cell(row, columns.role);
 
-    // A trailing blank row in an export is not worth reporting.
+    // The sheet carries a block of empty rows below the data; they are not
+    // mistakes, so they are skipped without being reported.
     if (!personRaw && !company && !role) return;
 
     if (!personRaw || !company || !role) {
@@ -97,20 +97,11 @@ export function parseSheet(csvText: string): ParseResult {
       return;
     }
 
-    const appliedDate = parseDate(cell(row, columns.appliedDate));
-    if (!appliedDate) {
-      errors.push({
-        row: rowNumber,
-        reason: `Unreadable applied date: "${cell(row, columns.appliedDate)}"`,
-      });
-      return;
-    }
-
     const mapping = resolveStageAndOutcome(row, columns);
     if (!mapping) {
       const raw = rawStatusText(row, columns);
       unmapped.add(raw || '(blank)');
-      errors.push({ row: rowNumber, reason: `Unmapped status: "${raw || '(blank)'}"` });
+      errors.push({ row: rowNumber, reason: `Unmapped funnel values: ${raw || '(blank)'}` });
       return;
     }
 
@@ -122,10 +113,35 @@ export function parseSheet(csvText: string): ParseResult {
       return;
     }
 
-    const lastActivityRaw = cell(row, columns.lastActivity);
-    const lastActivity = lastActivityRaw ? parseDate(lastActivityRaw) : undefined;
-    if (lastActivityRaw && !lastActivity) {
-      errors.push({ row: rowNumber, reason: `Unreadable last-activity date: "${lastActivityRaw}"` });
+    const dates: Record<string, Date | undefined> = {};
+    let badDate = false;
+    for (const field of ['appliedDate', 'closingDate', 'lastActivity'] as const) {
+      const raw = cell(row, columns[field]);
+      if (!raw) continue;
+      const parsedDate = parseDate(raw);
+      if (!parsedDate) {
+        errors.push({ row: rowNumber, reason: `Unreadable ${field} date: "${raw}"` });
+        badDate = true;
+        break;
+      }
+      dates[field] = parsedDate;
+    }
+    if (badDate) return;
+
+    // The applied date is what separates a sent application from a shortlisted
+    // one, so a disagreement between the two is a data problem worth reporting.
+    if (mapping.outcome === 'NOT_APPLIED' && dates.appliedDate) {
+      errors.push({
+        row: rowNumber,
+        reason: 'Marked "not yet applied" but has an application date',
+      });
+      return;
+    }
+    if (mapping.outcome !== 'NOT_APPLIED' && !dates.appliedDate) {
+      errors.push({
+        row: rowNumber,
+        reason: 'Has funnel progress but no application date',
+      });
       return;
     }
 
@@ -141,8 +157,9 @@ export function parseSheet(csvText: string): ParseResult {
       location: cell(row, columns.location) || undefined,
       workType,
       jobUrl: cell(row, columns.jobUrl) || undefined,
-      appliedDate,
-      lastActivity,
+      appliedDate: dates.appliedDate,
+      closingDate: dates.closingDate,
+      lastActivity: dates.lastActivity,
       furthestStage: mapping.furthestStage,
       outcome: mapping.outcome,
       notes: cell(row, columns.notes) || undefined,

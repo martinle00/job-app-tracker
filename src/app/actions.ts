@@ -24,7 +24,7 @@ function revalidateViews() {
 
 function toInput(formData: FormData) {
   return Object.fromEntries(
-    ['person', 'company', 'role', 'source', 'location', 'workType', 'jobUrl', 'appliedDate', 'lastActivity', 'furthestStage', 'outcome', 'notes'].map(
+    ['person', 'company', 'role', 'source', 'location', 'workType', 'jobUrl', 'appliedDate', 'closingDate', 'lastActivity', 'furthestStage', 'outcome', 'notes'].map(
       (key) => [key, String(formData.get(key) ?? '')],
     ),
   );
@@ -58,7 +58,8 @@ export async function saveApplication(
     location: input.location ?? null,
     workType: input.workType ?? null,
     jobUrl: input.jobUrl ?? null,
-    appliedDate: input.appliedDate,
+    appliedDate: input.appliedDate ?? null,
+    closingDate: input.closingDate ?? null,
     lastActivity: input.lastActivity ?? null,
     furthestStage: input.furthestStage,
     outcome: input.outcome,
@@ -72,11 +73,11 @@ export async function saveApplication(
       await prisma.application.create({ data });
     }
   } catch (error) {
-    // The (person, company, role, appliedDate) uniqueness that makes the CSV
-    // import idempotent also catches accidental duplicates entered by hand.
+    // The (person, company, role) uniqueness that makes the CSV import
+    // idempotent also catches accidental duplicates entered by hand.
     if (isUniqueConstraintError(error)) {
       return invalid([
-        'An application already exists for this person, company, role and applied date.',
+        'This person already has a row for that company and role.',
       ]);
     }
     throw error;

@@ -59,11 +59,13 @@ async function main() {
         create: { name: record.personName, displayName: record.personDisplayName },
       });
 
+      // Keyed without the applied date on purpose: a shortlisted row gains one
+      // when it is finally sent, and that has to update the row rather than
+      // fork it into a second copy.
       const importKey = {
         personId: person.id,
         company: record.company,
         role: record.role,
-        appliedDate: record.appliedDate,
       };
 
       const existing = await prisma.application.findUnique({ where: { importKey } });
@@ -73,6 +75,8 @@ async function main() {
         location: record.location ?? null,
         workType: record.workType ?? null,
         jobUrl: record.jobUrl ?? null,
+        appliedDate: record.appliedDate ?? null,
+        closingDate: record.closingDate ?? null,
         lastActivity: record.lastActivity ?? null,
         furthestStage: record.furthestStage,
         outcome: record.outcome,
@@ -91,7 +95,11 @@ async function main() {
     await prisma.$disconnect();
   }
 
+  const shortlisted = result.records.filter((r) => r.outcome === 'NOT_APPLIED').length;
   console.log(`\nImported ${result.records.length} rows (${created} created, ${updated} updated).`);
+  if (shortlisted > 0) {
+    console.log(`${shortlisted} of them are shortlisted roles not applied to yet.`);
+  }
 
   if (result.errors.length > 0) {
     console.warn(`\nSkipped ${result.errors.length} rows:`);
@@ -104,7 +112,9 @@ async function main() {
   }
 
   if (result.unmappedStatuses.length > 0) {
-    console.warn('\nUnmapped status values — add these to STATUS_MAP in scripts/column-map.ts:');
+    console.warn(
+      '\nUnmapped values — add these to RESPONSE_MAP / STAGE_MAP / YES_NO_MAP in scripts/column-map.ts:',
+    );
     for (const status of result.unmappedStatuses) console.warn(`  "${status}"`);
   }
 
