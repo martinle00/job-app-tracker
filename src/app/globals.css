@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+/* Sankey node labels sit over the ribbons where the chart is dense. A white
+   halo behind the glyphs keeps them readable without darkening the ribbons. */
+.sankey-surface svg text {
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}

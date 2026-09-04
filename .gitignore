@@ -1,0 +1,21 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local database
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-*
+
+# Real exported data is personal; keep it out of git.
+# Test fixtures under test/fixtures/ are committed deliberately.
+data/*.csv
+
+.env
+.env.local
+.DS_Store

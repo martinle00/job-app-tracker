@@ -1,0 +1,53 @@
+{
+  "name": "job-app-tracker",
+  "version": "1.0.0",
+  "description": "Track job applications across people, as a table or a funnel.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "import": "tsx scripts/import-sheet.ts",
+    "db:seed": "tsx scripts/import-sheet.ts test/fixtures/sample.csv",
+    "db:migrate": "prisma migrate dev",
+    "db:reset": "prisma migrate reset --force"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/martinle00/job-app-tracker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/martinle00/job-app-tracker/issues"
+  },
+  "homepage": "https://github.com/martinle00/job-app-tracker#readme",
+  "dependencies": {
+    "@nivo/core": "^0.99.0",
+    "@nivo/sankey": "^0.99.0",
+    "@prisma/client": "^6.19.3",
+    "@tanstack/react-table": "^8.21.3",
+    "next": "^15.5.25",
+    "papaparse": "^5.7.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "autoprefixer": "^10.5.4",
+    "playwright": "^1.62.1",
+    "postcss": "^8.5.28",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.0"
+  },
+  "private": true
+}

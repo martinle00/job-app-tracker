@@ -1,0 +1,47 @@
+// Job application tracker schema.
+//
+// `furthestStage` and `outcome` are plain strings because SQLite has no native
+// enum support in Prisma. Their permitted values live in src/lib/stages.ts and
+// are enforced by the Zod schemas in src/lib/validation.ts, which every write
+// path (form action and CSV importer) goes through.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Person {
+  id           String        @id @default(cuid())
+  // Normalised key used for matching: lower-cased, whitespace-collapsed.
+  name         String        @unique
+  // What we actually show in the UI, preserving the original casing.
+  displayName  String
+  applications Application[]
+}
+
+model Application {
+  id            String    @id @default(cuid())
+  person        Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId      String
+  company       String
+  role          String
+  source        String?
+  location      String?
+  workType      String?
+  jobUrl        String?
+  appliedDate   DateTime
+  lastActivity  DateTime?
+  furthestStage String
+  outcome       String
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([personId, company, role, appliedDate], name: "importKey")
+  @@index([personId])
+  @@index([appliedDate])
+}
