@@ -2,9 +2,14 @@
  * The single source of truth for the application funnel.
  *
  * The shape mirrors the tracking spreadsheet, which records progress across
- * four columns — Response, Stage, Offer, Accepted — rather than one status:
+ * four columns — Response, Stage, Offer, Accepted — rather than one status.
+ * The Stage dropdown's rounds become their own rungs so the chart shows where
+ * people drop out between interviews, not just that they interviewed:
  *
- *   Applied -> Response -> Interview -> Offer
+ *   Applied -> Response -> Online assessment -> 1st..4th round -> Offer
+ *
+ * Two of that dropdown's values — "Interview Failed" and "Interview Declined" —
+ * are outcomes rather than rungs, and are mapped as such in column-map.ts.
  *
  * STAGES is an *ordered ladder*: an application that reached index N is assumed
  * to have passed through every stage before it. That assumption is what lets
@@ -17,7 +22,11 @@
 export const STAGES = [
   { id: 'APPLIED', label: 'Applied' },
   { id: 'RESPONSE', label: 'Response' },
-  { id: 'INTERVIEW', label: 'Interview' },
+  { id: 'ONLINE_ASSESSMENT', label: 'Online assessment' },
+  { id: 'INTERVIEW_1', label: '1st round' },
+  { id: 'INTERVIEW_2', label: '2nd round' },
+  { id: 'INTERVIEW_3', label: '3rd round' },
+  { id: 'INTERVIEW_4', label: '4th round' },
   { id: 'OFFER', label: 'Offer' },
 ] as const;
 
@@ -25,9 +34,12 @@ export type StageId = (typeof STAGES)[number]['id'];
 
 export const STAGE_IDS = STAGES.map((s) => s.id) as readonly StageId[];
 
+/** The first interview round — the rung "did they interview at all" asks about. */
+export const FIRST_INTERVIEW_STAGE: StageId = 'INTERVIEW_1';
+
 /**
- * How an application ended, or that it hasn't ended — or, for NOT_APPLIED, that
- * it hasn't started. Every application sits at exactly one outcome, so these
+ * How an application ended, or that it hasn't — or, for NOT_APPLIED, that it
+ * hasn't started. Every application sits at exactly one outcome, so these
  * become the terminal nodes of the funnel.
  */
 export const OUTCOMES = [

@@ -19,13 +19,15 @@ describe('buildSankey', () => {
     expect(graph.total).toBe(0);
   });
 
-  it('walks a single application up the ladder and out to its outcome', () => {
-    const graph = buildSankey([app('INTERVIEW', 'REJECTED')]);
+  it('walks a single application up every rung and out to its outcome', () => {
+    const graph = buildSankey([app('INTERVIEW_2', 'REJECTED')]);
 
     expect(graph.links).toEqual([
       { source: 'APPLIED', target: 'RESPONSE', value: 1 },
-      { source: 'RESPONSE', target: 'INTERVIEW', value: 1 },
-      { source: 'INTERVIEW', target: outcomeNodeId('REJECTED'), value: 1 },
+      { source: 'RESPONSE', target: 'ONLINE_ASSESSMENT', value: 1 },
+      { source: 'ONLINE_ASSESSMENT', target: 'INTERVIEW_1', value: 1 },
+      { source: 'INTERVIEW_1', target: 'INTERVIEW_2', value: 1 },
+      { source: 'INTERVIEW_2', target: outcomeNodeId('REJECTED'), value: 1 },
     ]);
     expect(graph.total).toBe(1);
   });
@@ -57,7 +59,7 @@ describe('buildSankey', () => {
       app('APPLIED', 'IN_PROGRESS'),
       app('APPLIED', 'REJECTED'),
       app('RESPONSE', 'IN_PROGRESS'),
-      app('INTERVIEW', 'REJECTED'),
+      app('INTERVIEW_2', 'REJECTED'),
       app('OFFER', 'ACCEPTED'),
       app('OFFER', 'DECLINED'),
       app('APPLIED', 'NOT_APPLIED'),
@@ -76,7 +78,7 @@ describe('buildSankey', () => {
     const apps = [
       app('APPLIED', 'REJECTED'),
       app('RESPONSE', 'WITHDRAWN'),
-      app('INTERVIEW', 'IN_PROGRESS'),
+      app('INTERVIEW_1', 'IN_PROGRESS'),
       app('OFFER', 'ACCEPTED'),
     ];
     const graph = buildSankey(apps);
@@ -91,7 +93,7 @@ describe('buildSankey', () => {
   it('reports node totals as the number of applications passing through', () => {
     const graph = buildSankey([
       app('APPLIED', 'REJECTED'),
-      app('INTERVIEW', 'REJECTED'),
+      app('INTERVIEW_2', 'REJECTED'),
       app('OFFER', 'ACCEPTED'),
     ]);
 
@@ -99,7 +101,12 @@ describe('buildSankey', () => {
 
     expect(value('APPLIED')).toBe(3);
     expect(value('RESPONSE')).toBe(2);
-    expect(value('INTERVIEW')).toBe(2);
+    expect(value('ONLINE_ASSESSMENT')).toBe(2);
+    expect(value('INTERVIEW_1')).toBe(2);
+    expect(value('INTERVIEW_2')).toBe(2);
+    // Only the offer application climbed past the second round.
+    expect(value('INTERVIEW_3')).toBe(1);
+    expect(value('INTERVIEW_4')).toBe(1);
     expect(value('OFFER')).toBe(1);
     expect(value(outcomeNodeId('REJECTED'))).toBe(2);
     expect(value(outcomeNodeId('ACCEPTED'))).toBe(1);
@@ -116,7 +123,7 @@ describe('buildSankey', () => {
   });
 
   it('never emits a zero-weight link', () => {
-    const graph = buildSankey([app('INTERVIEW', 'IN_PROGRESS'), app('APPLIED', 'REJECTED')]);
+    const graph = buildSankey([app('INTERVIEW_4', 'IN_PROGRESS'), app('APPLIED', 'REJECTED')]);
     expect(graph.links.every((link) => link.value > 0)).toBe(true);
   });
 
