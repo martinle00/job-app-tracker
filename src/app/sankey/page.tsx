@@ -5,7 +5,7 @@ import { nodeColor } from '@/lib/chart-colors';
 import { parseFilters, type SearchParams } from '@/lib/filters';
 import { getApplications, getFilterOptions } from '@/lib/queries';
 import { buildSankey, outcomeNodeId, type SankeyGraph } from '@/lib/sankey';
-import { OUTCOMES } from '@/lib/stages';
+import { FIRST_INTERVIEW_STAGE, OUTCOMES } from '@/lib/stages';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,7 +67,7 @@ function Summary({ graph }: { graph: SankeyGraph }) {
   // disagree — the node value is exactly what flows through that rung.
   const atRung = (stage: string) => graph.nodes.find((n) => n.id === stage)?.value ?? 0;
   const responded = atRung('RESPONSE');
-  const interviewed = atRung('INTERVIEW');
+  const interviewed = atRung(FIRST_INTERVIEW_STAGE);
   const offers = atRung('OFFER');
 
   // Rates are of applications actually sent; the shortlist is not in the

@@ -69,16 +69,40 @@ describe('resolveStageAndOutcome', () => {
     });
   });
 
-  it('reads an interview round from the Stage column', () => {
-    expect(resolve({ Response: 'Positive Email', Stage: '1st Face-to-face' })).toEqual({
-      furthestStage: 'INTERVIEW',
+  it('maps every value in the sheet\'s Stage dropdown', () => {
+    const at = (Stage: string) => resolve({ Response: 'Positive Email', Stage });
+
+    expect(at('Waiting')).toEqual({ furthestStage: 'RESPONSE', outcome: 'IN_PROGRESS' });
+    expect(at('Online Assessment')).toEqual({
+      furthestStage: 'ONLINE_ASSESSMENT',
       outcome: 'IN_PROGRESS',
+    });
+    expect(at('1st Face-to-Face')).toEqual({ furthestStage: 'INTERVIEW_1', outcome: 'IN_PROGRESS' });
+    expect(at('2nd Face-to-Face')).toEqual({ furthestStage: 'INTERVIEW_2', outcome: 'IN_PROGRESS' });
+    expect(at('3rd Face-to-Face')).toEqual({ furthestStage: 'INTERVIEW_3', outcome: 'IN_PROGRESS' });
+    expect(at('4th Face-to-Face')).toEqual({ furthestStage: 'INTERVIEW_4', outcome: 'IN_PROGRESS' });
+    expect(at('Interview Failed')).toEqual({ furthestStage: 'INTERVIEW_1', outcome: 'REJECTED' });
+    expect(at('Interview Declined')).toEqual({ furthestStage: 'RESPONSE', outcome: 'WITHDRAWN' });
+  });
+
+  it('reads the round regardless of how the sheet punctuates it', () => {
+    expect(resolve({ Response: 'Positive Email', Stage: '1st face-to-face' })?.furthestStage).toBe(
+      'INTERVIEW_1',
+    );
+  });
+
+  it('does not let "Interview Declined" claim an interview happened', () => {
+    // The candidate turned the process down; only the invitation is evidence,
+    // and the Response column already accounts for that.
+    expect(resolve({ Response: 'Positive Phone Call', Stage: 'Interview Declined' })).toEqual({
+      furthestStage: 'RESPONSE',
+      outcome: 'WITHDRAWN',
     });
   });
 
   it('reads "Offer: No" as a rejection at the furthest stage reached', () => {
-    expect(resolve({ Response: 'Positive Email', Stage: '1st Face-to-face', Offer: 'No' })).toEqual({
-      furthestStage: 'INTERVIEW',
+    expect(resolve({ Response: 'Positive Email', Stage: '3rd Face-to-Face', Offer: 'No' })).toEqual({
+      furthestStage: 'INTERVIEW_3',
       outcome: 'REJECTED',
     });
   });
@@ -109,7 +133,7 @@ describe('resolveStageAndOutcome', () => {
   });
 
   it('does not let a stray later column promote a row nobody has applied to', () => {
-    expect(resolve({ Response: 'Not yet applied', Stage: '1st Face-to-face', Offer: 'Yes' })).toEqual({
+    expect(resolve({ Response: 'Not yet applied', Stage: '1st Face-to-Face', Offer: 'Yes' })).toEqual({
       furthestStage: 'APPLIED',
       outcome: 'NOT_APPLIED',
     });
@@ -137,7 +161,7 @@ describe('parseSheet', () => {
     const accc = result.records[0];
     expect(accc.personDisplayName).toBe('Nushan');
     expect(accc.company).toBe('ACCC');
-    expect(accc.furthestStage).toBe('INTERVIEW');
+    expect(accc.furthestStage).toBe('INTERVIEW_1');
     expect(accc.outcome).toBe('REJECTED');
     // 08/04/2025 is day-first: 8 April, not 4 August.
     expect(accc.appliedDate?.toISOString().slice(0, 10)).toBe('2025-04-08');

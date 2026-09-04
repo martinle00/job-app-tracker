@@ -80,8 +80,11 @@ funnel columns. `STAGES` in [`src/lib/stages.ts`](src/lib/stages.ts) is an **ord
 matching them:
 
 ```
-Applied → Response → Interview → Offer
+Applied → Response → Online assessment → 1st..4th round → Offer
 ```
+
+The rungs are the sheet's own Stage dropdown, so the chart shows drop-off
+*between* interview rounds rather than lumping them together.
 
 An application that reached a stage is taken to have passed through every stage before it. So
 [`buildSankey`](src/lib/sankey.ts) gives each application exactly one path: up the ladder to its
@@ -102,9 +105,19 @@ backwards.
 the middle changes the meaning of already-stored rows — remap existing data in the same
 migration. `src/lib/chart-colors.ts` carries one colour per rung and needs a matching step.
 
-Every interview round currently collapses into the single `Interview` rung, so the funnel shows
-how many people got to an interview but not how many rounds they survived. Splitting `1st
-Face-to-face` / `2nd` / `Final` into their own rungs is an edit to `STAGES` plus `STAGE_MAP`.
+**Two Stage values are outcomes, not rungs.** `Interview Failed` is a rejection that also proves
+an interview happened, so it lands on the *first* round — the least it can mean, since the Stage
+column holds one value and selecting it overwrites which round was reached. `Interview Declined`
+is the candidate withdrawing, and claims no interview took place, only that one was offered.
+
+**The ladder assumes an online assessment came before any interview.** A role that goes straight
+from a response to a first-round interview will still be counted at the Online assessment rung.
+If some of your processes skip it, that rung reads high — say so and it can come off the ladder.
+
+**Colour encodes the phase, not the rung.** A single hue cannot carry eight distinguishable
+ordinal steps, so the four interview rounds share a colour; the round is carried by each node's
+label and its position, which is the primary encoding in a Sankey anyway. See
+`src/lib/chart-colors.ts`.
 
 ## Scripts
 

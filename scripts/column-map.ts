@@ -15,7 +15,7 @@
  * Anything unrecognised is reported and its row is skipped. Nothing is ever
  * silently defaulted: a wrong guess here would quietly distort the funnel.
  */
-import type { OutcomeId, StageId } from '../src/lib/stages';
+import { stageIndex, type OutcomeId, type StageId } from '../src/lib/stages';
 
 export type MappableField =
   | 'person'
@@ -104,35 +104,39 @@ export const RESPONSE_MAP: Record<string, { stage: StageId; outcome?: OutcomeId 
 };
 
 /**
- * `Stage` values — the interview round reached.
+ * `Stage` values — the sheet's Stage dropdown, verbatim.
  *
- * "Waiting" means nothing has been scheduled, so it proves no progress beyond
- * whatever the Response column already established.
+ * `stage` is the rung the value proves, or null when it proves nothing beyond
+ * whatever Response already established. Two of the options are outcomes
+ * rather than rungs:
+ *
+ *  - "Interview Failed"   — the company said no *after* an interview, so it
+ *                           also proves at least a first round happened.
+ *  - "Interview Declined" — the candidate turned the process down. It claims
+ *                           no interview took place, only that one was offered,
+ *                           which the Response column already records.
+ *
+ * The Stage column holds a single value, so selecting either of those
+ * overwrites which round was reached. "Interview Failed" therefore lands on the
+ * *first* round — the least it can mean — rather than guessing higher.
  */
-export const STAGE_MAP: Record<string, StageId | null> = {
-  waiting: null,
-  na: null,
-  none: null,
+export const STAGE_MAP: Record<string, { stage: StageId | null; outcome?: OutcomeId }> = {
+  waiting: { stage: null },
+  na: { stage: null },
+  none: { stage: null },
 
-  '1stfacetoface': 'INTERVIEW',
-  '1stinterview': 'INTERVIEW',
-  '1stround': 'INTERVIEW',
-  '2ndfacetoface': 'INTERVIEW',
-  '2ndinterview': 'INTERVIEW',
-  '2ndround': 'INTERVIEW',
-  '3rdinterview': 'INTERVIEW',
-  '3rdround': 'INTERVIEW',
-  finalround: 'INTERVIEW',
-  finalinterview: 'INTERVIEW',
-  facetoface: 'INTERVIEW',
-  interview: 'INTERVIEW',
-  phonescreen: 'INTERVIEW',
-  phoneinterview: 'INTERVIEW',
-  assessmentcentre: 'INTERVIEW',
-  assessmentcenter: 'INTERVIEW',
-  technicalinterview: 'INTERVIEW',
-  takehome: 'INTERVIEW',
-  offer: 'OFFER',
+  onlineassessment: { stage: 'ONLINE_ASSESSMENT' },
+  oa: { stage: 'ONLINE_ASSESSMENT' },
+
+  '1stfacetoface': { stage: 'INTERVIEW_1' },
+  '2ndfacetoface': { stage: 'INTERVIEW_2' },
+  '3rdfacetoface': { stage: 'INTERVIEW_3' },
+  '4thfacetoface': { stage: 'INTERVIEW_4' },
+
+  interviewfailed: { stage: 'INTERVIEW_1', outcome: 'REJECTED' },
+  interviewdeclined: { stage: null, outcome: 'WITHDRAWN' },
+
+  offer: { stage: 'OFFER' },
 };
 
 /** Yes/no columns (`Offer`, `Accepted`). Blank means "not decided yet". */
@@ -206,9 +210,12 @@ export function resolveStageAndOutcome(
   if (outcome === 'NOT_APPLIED') return { furthestStage: 'APPLIED', outcome };
 
   if (stageText) {
-    if (!(stageText in STAGE_MAP)) return null;
-    const reached = STAGE_MAP[stageText];
-    if (reached && rung(reached) > rung(stage)) stage = reached;
+    const mapped = STAGE_MAP[stageText];
+    if (!mapped) return null;
+    if (mapped.stage && rung(mapped.stage) > rung(stage)) stage = mapped.stage;
+    // A later column is the more recent truth, so the Stage column's verdict
+    // wins over one the Response column had already implied.
+    if (mapped.outcome) outcome = mapped.outcome;
   }
 
   if (offerText) {
@@ -235,9 +242,8 @@ export function resolveStageAndOutcome(
   return { furthestStage: stage, outcome: outcome ?? 'IN_PROGRESS' };
 }
 
-const RUNG_ORDER: StageId[] = ['APPLIED', 'RESPONSE', 'INTERVIEW', 'OFFER'];
 function rung(stage: StageId): number {
-  return RUNG_ORDER.indexOf(stage);
+  return stageIndex(stage);
 }
 
 /** The raw text a row used, for reporting values that could not be mapped. */
