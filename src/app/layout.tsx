@@ -10,6 +10,12 @@ export const metadata: Metadata = {
   description: 'Track job applications across people, as a table or a funnel.',
 };
 
+// This layout reads the accent and the filter options from the database, so
+// prerendering any route would need a live connection at build time. Every page
+// under it is already dynamic; declaring it here covers `/` and the 404 page
+// too, which keeps deploys working even when the database is briefly down.
+export const dynamic = 'force-dynamic';
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The accent is a stored setting rather than a class, so one CSS variable
   // repaints every button, link and active nav item.
