@@ -4,13 +4,33 @@
 
 :root {
   color-scheme: light;
+  --font-sans: 'DM Sans';
+  --font-serif: 'Newsreader';
+  --font-mono: 'DM Mono';
+  /* Overridden per-request from the stored accent setting in layout.tsx. */
+  --accent: #a3623f;
 }
 
-/* Sankey node labels sit over the ribbons where the chart is dense. A white
-   halo behind the glyphs keeps them readable without darkening the ribbons. */
+/* Sankey node labels sit over the ribbons where the chart is dense. A halo in
+   the surface colour behind the glyphs keeps them readable without darkening
+   the ribbons. */
 .sankey-surface svg text {
   paint-order: stroke;
-  stroke: #ffffff;
-  stroke-width: 3px;
+  stroke: #fffdfa;
+  stroke-width: 3.5px;
   stroke-linejoin: round;
+}
+
+/* Stage and outcome nodes are click targets: they filter the table. */
+.sankey-surface svg rect {
+  cursor: pointer;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #e0d5c6;
+  border-radius: 8px;
 }

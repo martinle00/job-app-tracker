@@ -101,6 +101,7 @@ export const RESPONSE_MAP: Record<string, { stage: StageId; outcome?: OutcomeId 
 
   withdrawn: { stage: 'APPLIED', outcome: 'WITHDRAWN' },
   withdrew: { stage: 'APPLIED', outcome: 'WITHDRAWN' },
+  withdrewapplication: { stage: 'APPLIED', outcome: 'WITHDRAWN' },
 };
 
 /**

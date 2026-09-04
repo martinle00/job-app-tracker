@@ -18,8 +18,13 @@ model Person {
   id           String        @id @default(cuid())
   // Normalised key used for matching: lower-cased, whitespace-collapsed.
   name         String        @unique
-  // What we actually show in the UI, preserving the original casing.
+  // What we actually show in the UI, preserving the original casing. Editable
+  // in Settings: it is an alias, not an identity, so renaming must not fork the
+  // person or break the import key.
   displayName  String
+  // Dot colour shown beside this person in the table and the people filter.
+  // Null falls back to a neutral, so an unset colour is not an error state.
+  color        String?
   applications Application[]
 }
 
@@ -49,4 +54,11 @@ model Application {
   @@unique([personId, company, role], name: "importKey")
   @@index([personId])
   @@index([appliedDate])
+}
+
+/// Single-row-per-key store for tracker-wide preferences (currently the accent
+/// colour). There are no accounts, so preferences are shared like the data is.
+model Setting {
+  key   String @id
+  value String
 }

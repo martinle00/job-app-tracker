@@ -4,203 +4,198 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
+import { stageColor } from '@/lib/chart-colors';
 import type { ApplicationRow } from '@/lib/queries';
-import { OUTCOMES, isStageId, stageIndex, stageLabel } from '@/lib/stages';
-import { OutcomeBadge, StageBadge } from './StatusBadge';
+import { STAGES, isStageId, stageIndex, stageLabel } from '@/lib/stages';
+import { closingStatus, formatDay } from '@/lib/urgency';
+import { OutcomeBadge } from './StatusBadge';
 
 const columnHelper = createColumnHelper<ApplicationRow>();
 
 interface Props {
   rows: ApplicationRow[];
-  onEdit: (row: ApplicationRow) => void;
-  onDelete: (row: ApplicationRow) => void;
+  selectedId: string | null;
+  onSelect: (row: ApplicationRow) => void;
 }
 
-export function ApplicationTable({ rows, onEdit, onDelete }: Props) {
+/**
+ * Nine columns was more than a glance can take, so the table now carries the
+ * five things that answer "what do I chase today" — who, what, when it went,
+ * when it closes, how far it got — and the rest lives in the detail drawer.
+ */
+export function ApplicationTable({ rows, selectedId, onSelect }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'appliedDate', desc: true }]);
-  const [search, setSearch] = useState('');
 
   const columns = useMemo(
     () => [
-      columnHelper.accessor('person', { header: 'Person' }),
-      columnHelper.accessor('company', { header: 'Company' }),
-      columnHelper.accessor('role', { header: 'Role' }),
+      columnHelper.accessor('person', {
+        header: 'Person',
+        cell: (info) => (
+          <span className="flex items-center gap-2 whitespace-nowrap text-ink2">
+            <span
+              aria-hidden
+              className="h-[7px] w-[7px] rounded-full"
+              style={{ background: info.row.original.personColor ?? '#b3a897' }}
+            />
+            {info.getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('company', {
+        header: 'Role',
+        cell: (info) => (
+          <span className="flex flex-col">
+            <span className="font-medium text-ink">{info.getValue()}</span>
+            <span className="text-[12.5px] text-muted">{info.row.original.role}</span>
+          </span>
+        ),
+      }),
       columnHelper.accessor('appliedDate', {
         header: 'Applied',
-        cell: (info) =>
-          info.getValue() ?? <span className="text-slate-400">not yet</span>,
+        cell: (info) => {
+          const applied = info.getValue();
+          // Never applied and the window is gone: a missed opportunity worth
+          // flagging, unlike a closing date that passed after applying.
+          const missed = !applied && closingStatus(info.row.original.closingDate).urgency === 'closed';
+          const className = missed
+            ? 'bg-bad-bg text-bad-fg'
+            : applied
+              ? 'bg-[#f4efe7] text-neutral-fg'
+              : 'text-[#bdb2a2]';
+          return (
+            <span className={`inline-block rounded-[7px] px-2 py-0.5 text-xs ${className}`}>
+              {applied ? formatDay(applied) : 'not sent'}
+            </span>
+          );
+        },
       }),
       columnHelper.accessor('closingDate', {
         header: 'Closes',
-        cell: (info) => info.getValue() ?? <span className="text-slate-400">—</span>,
+        cell: (info) => {
+          const status = closingStatus(info.getValue());
+          return (
+            <span className={`inline-block rounded-[7px] px-2 py-0.5 text-xs ${status.className}`}>
+              {status.label}
+            </span>
+          );
+        },
       }),
       columnHelper.accessor('furthestStage', {
-        header: 'Furthest stage',
+        header: 'Progress',
         // Sort by ladder position rather than alphabetically, so the column
         // orders the way the funnel actually runs.
         sortingFn: (a, b) => ladderPosition(a.original.furthestStage) - ladderPosition(b.original.furthestStage),
-        // A shortlisted row has not entered the funnel, so it has no rung.
-        cell: (info) =>
-          info.row.original.outcome === 'NOT_APPLIED' ? (
-            <span className="text-slate-400">—</span>
-          ) : (
-            <StageBadge stage={info.getValue()} />
-          ),
-      }),
-      columnHelper.accessor('outcome', {
-        header: 'Outcome',
-        cell: (info) => <OutcomeBadge outcome={info.getValue()} />,
-      }),
-      columnHelper.accessor('source', {
-        header: 'Source',
-        cell: (info) => info.getValue() ?? <span className="text-slate-400">—</span>,
-      }),
-      columnHelper.accessor('location', {
-        header: 'Location',
-        cell: (info) => info.getValue() ?? <span className="text-slate-400">—</span>,
+        cell: (info) => {
+          const row = info.row.original;
+          const shortlisted = row.outcome === 'NOT_APPLIED';
+          const reached = isStageId(row.furthestStage) ? stageIndex(row.furthestStage) + 1 : 0;
+          return (
+            <span className="flex min-w-[132px] flex-col gap-1.5">
+              <span className="text-xs text-ink2">
+                {shortlisted ? 'shortlisted' : stageLabel(row.furthestStage)}
+              </span>
+              <span className="flex h-1 w-full overflow-hidden rounded-sm bg-[#efe6d9]">
+                <span
+                  className="h-full rounded-sm"
+                  style={{
+                    width: shortlisted ? 0 : `${(reached / STAGES.length) * 100}%`,
+                    background: stageColor(row.furthestStage),
+                  }}
+                />
+              </span>
+            </span>
+          );
+        },
       }),
       columnHelper.display({
-        id: 'actions',
-        header: '',
+        id: 'outcome',
+        header: 'Outcome',
         cell: (info) => (
-          <div className="flex justify-end gap-2 whitespace-nowrap">
-            <button
-              type="button"
-              onClick={() => onEdit(info.row.original)}
-              className="text-xs font-medium text-slate-600 underline underline-offset-2 hover:text-slate-900"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(info.row.original)}
-              className="text-xs font-medium text-rose-600 underline underline-offset-2 hover:text-rose-800"
-            >
-              Delete
-            </button>
-          </div>
+          <span className="flex items-center justify-end whitespace-nowrap">
+            <OutcomeBadge outcome={info.row.original.outcome} />
+          </span>
         ),
       }),
     ],
-    [onEdit, onDelete],
+    [],
   );
 
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting, globalFilter: search },
+    state: { sorting },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setSearch,
-    // Search the text a person would actually recognise, including the human
-    // labels rather than the stored ids.
-    globalFilterFn: (row, _columnId, filterValue) => {
-      const needle = String(filterValue).toLowerCase();
-      const app = row.original;
-      const haystack = [
-        app.person,
-        app.company,
-        app.role,
-        app.source,
-        app.location,
-        app.notes,
-        stageLabel(app.furthestStage),
-        OUTCOMES.find((o) => o.id === app.outcome)?.label,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(needle);
-    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
   });
 
-  const visibleRows = table.getRowModel().rows;
-
   return (
-    <div>
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search company, role, notes…"
-          aria-label="Search applications"
-          className="w-72 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-        />
-        <p className="text-sm text-slate-500">
-          {visibleRows.length} of {rows.length} shown
-        </p>
-      </div>
-
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full border-collapse text-sm">
-          <thead className="bg-slate-50">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  const sortable = header.column.getCanSort() && header.column.id !== 'actions';
-                  const direction = header.column.getIsSorted();
-                  return (
-                    <th
-                      key={header.id}
-                      scope="col"
-                      aria-sort={
-                        direction === 'asc'
-                          ? 'ascending'
-                          : direction === 'desc'
-                            ? 'descending'
-                            : undefined
-                      }
-                      className="border-b border-slate-200 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
-                    >
-                      {sortable ? (
-                        <button
-                          type="button"
-                          onClick={header.column.getToggleSortingHandler()}
-                          className="flex items-center gap-1 hover:text-slate-900"
-                        >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          <span aria-hidden className="text-slate-400">
-                            {direction === 'asc' ? '▲' : direction === 'desc' ? '▼' : '↕'}
-                          </span>
-                        </button>
-                      ) : (
-                        flexRender(header.column.columnDef.header, header.getContext())
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {visibleRows.map((row) => (
-              <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-3 py-2 align-middle">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {visibleRows.length === 0 && (
-              <tr>
-                <td colSpan={columns.length} className="px-3 py-10 text-center text-sm text-slate-500">
-                  No applications match the current filters.
+    <div className="overflow-hidden rounded-card border border-line bg-surface">
+      <table className="w-full border-collapse text-[13.5px]">
+        <thead className="bg-surface2">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                const sortable = header.column.getCanSort();
+                const direction = header.column.getIsSorted();
+                const last = header.column.id === 'outcome';
+                return (
+                  <th
+                    key={header.id}
+                    scope="col"
+                    aria-sort={
+                      direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : undefined
+                    }
+                    className={`border-b border-line2 px-4 py-2.5 text-[11px] font-medium uppercase tracking-[0.07em] text-faint ${last ? 'text-right' : 'text-left'}`}
+                  >
+                    {sortable ? (
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        className="flex items-center gap-1 hover:text-ink"
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        <span aria-hidden className="text-[#c4b8a6]">
+                          {direction === 'asc' ? '▴' : direction === 'desc' ? '▾' : ''}
+                        </span>
+                      </button>
+                    ) : (
+                      flexRender(header.column.columnDef.header, header.getContext())
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {table.getRowModel().rows.map((row) => (
+            <tr
+              key={row.id}
+              onClick={() => onSelect(row.original)}
+              className={`cursor-pointer border-b border-line3 last:border-0 hover:bg-surface2 ${selectedId === row.original.id ? 'bg-[#f7f1e8]' : ''}`}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <td key={cell.id} className="px-4 py-3 align-middle">
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={columns.length} className="px-4 py-11 text-center text-[13px] text-faint">
+                No applications match the current filters.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

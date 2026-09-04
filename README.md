@@ -1,154 +1,68 @@
-# Job Application Tracker
+# Redesign patch for job-app-tracker
 
-Track job applications across several people and read them two ways:
+The UI redesign from the design session, written as real source for this app:
+Next.js App Router + Tailwind + Prisma, following the conventions already in the
+repo (URL-driven filters, server actions, `src/lib/stages.ts` as the single
+source of truth for the vocabulary).
 
-- **Table** (`/applications`) — every application, sortable, searchable, editable.
-- **Funnel** (`/sankey`) — a Sankey diagram of the whole pipeline, collated across everyone or
-  filtered down to specific people.
-
-Both views read the same filters out of the URL, so they always describe the same set of
-applications and a filtered view is a shareable link.
-
-Next.js (App Router) + Prisma + SQLite. No accounts: the person who applied is a field on each
-application, and everyone sees everything.
-
-## Getting started
+Paths mirror the repo, so applying it is a copy over the top:
 
 ```bash
-npm install
-cp .env.example .env          # DATABASE_URL="file:./dev.db"
-npx prisma migrate dev        # create the database
-npm run db:seed               # optional: load the sample fixture
-npm run dev                   # http://localhost:3000
+cp -R codebase-patch/src        job-app-tracker/
+cp -R codebase-patch/prisma     job-app-tracker/
+cp    codebase-patch/tailwind.config.ts job-app-tracker/
+cd job-app-tracker
+npx prisma migrate dev          # picks up the new migration
+npm run typecheck && npm run test && npm run dev
 ```
 
-## Importing the spreadsheet
+Nothing new to install — it uses the deps already in `package.json`
+(`@nivo/sankey`, `@tanstack/react-table`, `zod`).
 
-Export the Google Sheet as CSV, save it to `data/applications.csv`, then:
+## What changed
 
-```bash
-npm run import                        # or: npx tsx scripts/import-sheet.ts path/to/export.csv
-```
-
-The importer expects the tracking sheet's own columns:
-
-| Sheet column | Used as |
+| File | Change |
 |---|---|
-| Person | who applied |
-| Company, Role Title | the application |
-| Application Date | when it was sent; blank means not sent yet |
-| Closing Date | when applications close |
-| Response, Stage, Offer, Accepted | the four funnel columns |
+| `tailwind.config.ts` | Warm palette + type scale as named theme tokens. |
+| `src/app/globals.css` | Font faces, `--accent` variable, Sankey label halo. |
+| `src/app/layout.tsx` | Two-pane shell; reads the stored accent into `--accent`. |
+| `src/components/AppShell.tsx` | **New.** Collapsible sidebar that holds nav + filters. |
+| `src/components/FilterSidebar.tsx` | **Replaces `FilterBar.tsx`** — same URL contract, sidebar layout. Delete `FilterBar.tsx`. |
+| `src/components/NavLinks.tsx` | Table / Funnel / Settings. Settings drops the filter query. |
+| `src/components/PageHeader.tsx` | **New.** Title, scope, URL-backed search (debounced), action slot. |
+| `src/components/ApplicationTable.tsx` | Five columns + closing-date urgency chip, progress track, quick-advance; row click opens the drawer. |
+| `src/components/ApplicationDrawer.tsx` | **New.** The dropped columns, activity list, advance/edit. |
+| `src/components/ApplicationsView.tsx` | Owns drawer + dialog + header action. |
+| `src/components/ApplicationForm.tsx` | Light dialog: six fields, the rest behind a disclosure. |
+| `src/components/SankeyChart.tsx` | Warm ramp, node click drills into the table, conversion in the tooltip. |
+| `src/components/StatusBadge.tsx` | Warm status tones. |
+| `src/components/SettingsView.tsx` | **New.** Alias, dot colour, accent. |
+| `src/app/settings/page.tsx` | **New.** |
+| `src/app/applications/page.tsx` | Triage tiles (live / no reply in 14 days / closing this week / offers). |
+| `src/app/sankey/page.tsx` | Re-toned tiles, legend and copy. |
+| `src/lib/urgency.ts` | **New.** Closing-date urgency + UTC-safe day formatting. |
+| `src/lib/settings.ts` | **New.** Accent get/set, validated against the offered list. |
+| `src/lib/chart-colors.ts` | Clay ordinal ramp; person + accent choice lists. |
+| `src/lib/queries.ts` | Person `color` on every row and filter option. |
+| `src/app/actions.ts` | `advanceStage`, `updatePerson`, `updateAccent`. |
+| `prisma/schema.prisma` + migration | `Person.color`, `Setting` key/value table. |
 
-The import is **idempotent** — rows are upserted on `(person, company, role)`, which is one row
-per role, the same as the sheet. The applied date is deliberately *not* part of that key: a
-shortlisted row gains one when it is finally sent, and re-importing must update that row rather
-than fork it into a second copy.
+## Decisions worth knowing
 
-Dates are read **day-first** (`29/8/2026` is 29 August), matching how the sheet is written.
-
-`data/*.csv` is gitignored, because a real export is personal job-search data.
-
-### When the import reports skipped rows
-
-The importer never guesses. If it cannot map a row it reports it and exits non-zero:
-
-```
-Skipped 1 rows:
-  row 12: Unmapped funnel values: Response=Coffee chat
-
-Unmapped values — add these to RESPONSE_MAP / STAGE_MAP / YES_NO_MAP in scripts/column-map.ts:
-  "Response=Coffee chat"
-```
-
-Everything that knows about the sheet's shape lives in [`scripts/column-map.ts`](scripts/column-map.ts):
-
-- `COLUMN_ALIASES` — which sheet headers feed which field. Add your header text here if a column
-  is reported missing.
-- `RESPONSE_MAP`, `STAGE_MAP`, `YES_NO_MAP` — the dropdown values each funnel column accepts.
-  **Add new dropdown options here as you add them to the sheet.**
-
-`resolveStageAndOutcome` reads all four funnel columns together and takes the furthest evidence:
-an `Offer` of Yes proves the Offer rung whatever `Stage` says, and `Accepted` settles the
-outcome. `Response: Not yet applied` short-circuits everything — a shortlisted row is held at the
-start of the funnel and later columns cannot promote it.
-
-## How the funnel is derived
-
-Each application stores one `furthestStage` and one `outcome`, derived from the sheet's four
-funnel columns. `STAGES` in [`src/lib/stages.ts`](src/lib/stages.ts) is an **ordered ladder**
-matching them:
-
-```
-Applied → Response → Online assessment → 1st..4th round → Offer
-```
-
-The rungs are the sheet's own Stage dropdown, so the chart shows drop-off
-*between* interview rounds rather than lumping them together.
-
-An application that reached a stage is taken to have passed through every stage before it. So
-[`buildSankey`](src/lib/sankey.ts) gives each application exactly one path: up the ladder to its
-furthest stage, then sideways into its outcome node (`Active`, `Rejected`, `Withdrew`,
-`Declined offer`, `Accepted`). Inflow equals outflow at every stage node, so the ribbon widths
-are real counts.
-
-**Roles you have not applied to yet are held out of the funnel.** They are real rows — they have
-a closing date to work towards and they show in the table — but nothing has flowed through the
-funnel yet, so counting them as applications would overstate the top and drag every conversion
-rate down. The funnel reports them as a separate "Not yet applied" figure.
-
-That is what lets a flat spreadsheet drive a Sankey without a per-application event log. The
-tradeoff: the chart cannot show a path that skipped a stage, or an application that went
-backwards.
-
-**Changing the ladder.** Appending a stage is a code change plus a migration. Inserting one in
-the middle changes the meaning of already-stored rows — remap existing data in the same
-migration. `src/lib/chart-colors.ts` carries one colour per rung and needs a matching step.
-
-**Two Stage values are outcomes, not rungs.** `Interview Failed` is a rejection that also proves
-an interview happened, so it lands on the *first* round — the least it can mean, since the Stage
-column holds one value and selecting it overwrites which round was reached. `Interview Declined`
-is the candidate withdrawing, and claims no interview took place, only that one was offered.
-
-**The ladder assumes an online assessment came before any interview.** A role that goes straight
-from a response to a first-round interview will still be counted at the Online assessment rung.
-If some of your processes skip it, that rung reads high — say so and it can come off the ladder.
-
-**Colour encodes the phase, not the rung.** A single hue cannot carry eight distinguishable
-ordinal steps, so the four interview rounds share a colour; the round is carried by each node's
-label and its position, which is the primary encoding in a Sankey anyway. See
-`src/lib/chart-colors.ts`.
-
-## Scripts
-
-| Command | What it does |
-|---|---|
-| `npm run dev` | Development server |
-| `npm run build` | Generate the Prisma client and build for production |
-| `npm run test` | Vitest — funnel derivation, sheet parsing, filters |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run import` | Import `data/applications.csv` |
-| `npm run db:seed` | Import the sample fixture |
-| `npm run db:migrate` | `prisma migrate dev` |
-| `npm run db:reset` | Drop and rebuild the database |
-
-## Layout
-
-```
-prisma/schema.prisma          Person, Application
-src/lib/stages.ts             the stage ladder and outcome vocabulary
-src/lib/sankey.ts             pure buildSankey(apps) -> { nodes, links }
-src/lib/filters.ts            URL search params <-> Prisma where clause
-src/lib/validation.ts         Zod schemas shared by the form and the importer
-src/lib/chart-colors.ts       funnel palette, with the reasoning behind it
-src/app/applications/page.tsx table view
-src/app/sankey/page.tsx       funnel view
-src/app/actions.ts            create / update / delete
-scripts/column-map.ts         sheet-specific column and status mapping
-scripts/parse-sheet.ts        pure CSV -> records
-scripts/import-sheet.ts       records -> database
-```
-
-`src/lib/stages.ts` is the single source of truth for the vocabulary; every write path validates
-against it through `src/lib/validation.ts`, so an unknown stage or outcome cannot reach the
-database.
+- **`advanceStage` never touches the outcome.** Reaching a rung is not an
+  ending; endings stay an explicit choice in the form. It stamps
+  `lastActivity`, which is what makes a row stop reading as stale.
+- **Renaming a person only writes `displayName`.** The normalised `name` is the
+  identity and part of the import key, so a rename cannot fork rows or break a
+  re-import.
+- **The activity list does not invent dates.** The schema stores one
+  `furthestStage`, not an event log, so passed rungs are listed as "reached"
+  and only `appliedDate` / `lastActivity` / `closingDate` carry dates. If you
+  want a dated timeline, that needs an `ApplicationEvent` table — say so and
+  it's a small follow-up.
+- **The accent is a shared setting, not per-user**, matching the app's "no
+  accounts, everyone sees everything" model. "Which person am I" is the one
+  genuinely local preference, so it lives in `localStorage`.
+- **Files to delete after applying:** `src/components/FilterBar.tsx`.
+- **Tests:** `test/filters.test.ts`, `sankey.test.ts` and `parse-sheet.test.ts`
+  are untouched and should still pass — none of the lib contracts changed.

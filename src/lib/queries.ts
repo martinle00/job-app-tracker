@@ -6,6 +6,7 @@ export interface ApplicationRow {
   id: string;
   person: string;
   personKey: string;
+  personColor: string | null;
   company: string;
   role: string;
   source: string | null;
@@ -29,13 +30,14 @@ export async function getApplications(filters: Filters): Promise<ApplicationRow[
     where: toPrismaWhere(filters),
     // Nulls last: shortlisted roles sit below everything actually sent.
     orderBy: [{ appliedDate: { sort: 'desc', nulls: 'last' } }, { company: 'asc' }],
-    include: { person: { select: { name: true, displayName: true } } },
+    include: { person: { select: { name: true, displayName: true, color: true } } },
   });
 
   return rows.map((row) => ({
     id: row.id,
     person: row.person.displayName,
     personKey: row.person.name,
+    personColor: row.person.color,
     company: row.company,
     role: row.role,
     source: row.source,
@@ -52,14 +54,19 @@ export async function getApplications(filters: Filters): Promise<ApplicationRow[
 }
 
 /**
- * Options for the filter bar. Deliberately unfiltered: the choices on offer
+ * Options for the filter sidebar. Deliberately unfiltered: the choices on offer
  * should not disappear as you narrow the view, or filters become a dead end.
  */
 export async function getFilterOptions() {
   const [people, sources] = await Promise.all([
     prisma.person.findMany({
       orderBy: { displayName: 'asc' },
-      select: { name: true, displayName: true, _count: { select: { applications: true } } },
+      select: {
+        name: true,
+        displayName: true,
+        color: true,
+        _count: { select: { applications: true } },
+      },
     }),
     prisma.application.findMany({
       where: { source: { not: null } },
@@ -73,6 +80,7 @@ export async function getFilterOptions() {
     people: people.map((person) => ({
       name: person.name,
       displayName: person.displayName,
+      color: person.color,
       count: person._count.applications,
     })),
     sources: sources.map((row) => row.source).filter((s): s is string => Boolean(s)),
@@ -82,6 +90,6 @@ export async function getFilterOptions() {
 export async function getPeople() {
   return prisma.person.findMany({
     orderBy: { displayName: 'asc' },
-    select: { name: true, displayName: true },
+    select: { id: true, name: true, displayName: true, color: true },
   });
 }
