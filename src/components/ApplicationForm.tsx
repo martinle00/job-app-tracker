@@ -46,18 +46,46 @@ export function ApplicationForm({ application, knownPeople, onClose, onSaved }: 
       role="dialog"
       aria-modal="true"
       aria-label={application ? 'Edit application' : 'Add application'}
-      className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-ink/[0.22] px-6 py-16"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-surface md:absolute md:z-40 md:bg-ink/[0.22] md:px-6 md:py-16"
     >
+      {/*
+        Full screen on a phone: adding a role is a task with its own Cancel /
+        Save commitment, so it earns the whole screen rather than a sheet you
+        might swipe away mid-entry. A centred dialog from md up.
+      */}
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-[496px] rounded-2xl border border-line bg-surface p-[22px] shadow-[0_24px_60px_rgba(60,45,30,0.16)]"
+        className="flex w-full max-w-[496px] flex-col rounded-none border-line bg-surface p-0 md:block md:rounded-2xl md:border md:p-[22px] md:shadow-[0_24px_60px_rgba(60,45,30,0.16)]"
       >
-        <div className="mb-4 flex items-baseline justify-between">
-          <h2 className="font-serif text-xl">{application ? 'Edit application' : 'Add application'}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-[15px] text-faint">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line2 bg-surface px-4 py-3 md:static md:mb-4 md:items-baseline md:border-0 md:px-0 md:py-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-none text-[15px] text-muted md:hidden"
+          >
+            Cancel
+          </button>
+          <h2 className="font-serif text-[19px] md:text-xl">
+            {application ? 'Edit application' : 'New application'}
+          </h2>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-none text-[15px] font-medium text-[color:var(--accent)] disabled:opacity-60 md:hidden"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="hidden text-[15px] text-faint md:block"
+          >
             ×
           </button>
         </div>
+
+        <div className="flex flex-col px-4 pb-8 pt-4 md:px-0 md:pb-0 md:pt-0">
 
         {result && !result.ok && result.formErrors.length > 0 && (
           <div role="alert" className="mb-4 rounded-[10px] border border-[#e8cfc9] bg-bad-bg px-3 py-2 text-[13px] text-bad-fg">
@@ -148,15 +176,16 @@ export function ApplicationForm({ application, knownPeople, onClose, onSaved }: 
           </div>
         </div>
 
-        <div className="mt-[18px] flex items-center justify-between gap-3">
+        <div className="mt-[18px] flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between md:gap-3">
           <button
             type="button"
             onClick={() => setShowMore((open) => !open)}
-            className="text-[12.5px] text-[color:var(--accent)]"
+            className="text-[13.5px] text-[color:var(--accent)] md:text-[12.5px]"
           >
             {showMore ? '− Fewer fields' : '+ Closing date, source, location, notes'}
           </button>
-          <span className="flex gap-2">
+          {/* On mobile these live in the sticky header instead. */}
+          <span className="hidden gap-2 md:flex">
             <button
               type="button"
               onClick={onClose}
@@ -173,6 +202,7 @@ export function ApplicationForm({ application, knownPeople, onClose, onSaved }: 
               {saving ? 'Saving…' : 'Save'}
             </button>
           </span>
+        </div>
         </div>
       </form>
     </div>

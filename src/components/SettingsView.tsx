@@ -28,9 +28,14 @@ export function SettingsView({ people, accent }: Props) {
 
   return (
     <>
-      <PageHeader title="Settings" scope="Names and colours for this tracker" searchable={false} />
+      <PageHeader
+        title="Settings"
+        scope="Names and colours"
+        searchable={false}
+        filterable={false}
+      />
 
-      <div className="flex-1 overflow-y-auto px-7 pb-10 pt-5">
+      <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 md:px-7 md:pt-5">
         <div className="flex max-w-[680px] flex-col gap-[18px]">
           <Card title="People" subtitle="Aliases and dot colours — shared, so everyone in this tracker sees the same names.">
             <div className="flex flex-col">
@@ -227,7 +232,7 @@ function EditPersonModal({
       role="dialog"
       aria-modal="true"
       aria-label={`Edit ${person.displayName}`}
-      className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-ink/[0.22] px-6 py-16"
+      className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-ink/[0.22] px-4 py-8 md:px-6 md:py-16"
     >
       <div
         className="w-full max-w-[420px] rounded-2xl border border-line bg-surface p-[22px] shadow-[0_24px_60px_rgba(60,45,30,0.16)]"
@@ -262,7 +267,7 @@ function EditPersonModal({
                     aria-pressed={selected}
                     aria-label={`Set colour to ${c}`}
                     onClick={() => setColor(c)}
-                    className={`flex h-[30px] w-[30px] items-center justify-center rounded-[9px] border-2 bg-surface ${selected ? 'border-[#cbbaa4]' : 'border-transparent'}`}
+                    className={`flex h-11 w-11 items-center justify-center rounded-[9px] border-2 bg-surface md:h-[30px] md:w-[30px] ${selected ? 'border-[#cbbaa4]' : 'border-transparent'}`}
                   >
                     <span aria-hidden className="h-3.5 w-3.5 rounded-full" style={{ background: c }} />
                   </button>

@@ -1,5 +1,5 @@
+import { FunnelView } from '@/components/FunnelView';
 import { PageHeader } from '@/components/PageHeader';
-import { SankeyChart } from '@/components/SankeyChart';
 import { nodeColor } from '@/lib/chart-colors';
 import { parseFilters, type SearchParams } from '@/lib/filters';
 import { getApplications, getFilterOptions } from '@/lib/queries';
@@ -22,12 +22,12 @@ export default async function SankeyPage({
 
   return (
     <>
-      <PageHeader title="Application funnel" scope={scope} />
+      <PageHeader title="Funnel" scope={scope} />
 
-      <div className="flex-1 overflow-y-auto px-7 pb-10 pt-5">
+      <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 md:px-7 md:pt-5">
         <Summary graph={graph} />
 
-        <div className="mb-1 flex items-baseline justify-between gap-3">
+        <div className="mb-1 hidden items-baseline justify-between gap-3 md:flex">
           <p className="text-[12.5px] text-muted">
             Click a rung to see those applications in the table. Hover for conversion from the rung
             before.
@@ -37,9 +37,7 @@ export default async function SankeyPage({
           </span>
         </div>
 
-        <SankeyChart graph={graph} />
-
-        <Legend graph={graph} />
+        <FunnelView graph={graph} legend={<Legend graph={graph} />} />
 
         {graph.notApplied > 0 && (
           <p className="mt-3.5 max-w-[760px] text-[12.5px] leading-5 text-muted">
@@ -80,12 +78,12 @@ function Summary({ graph }: { graph: SankeyGraph }) {
   ];
 
   return (
-    <dl className="mb-[18px] grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <dl className="mb-4 grid grid-cols-2 gap-2.5 md:mb-[18px] md:gap-3 lg:grid-cols-5">
       {tiles.map((tile) => (
-        <div key={tile.label} className="flex flex-col gap-1.5 rounded-[13px] border border-line bg-surface px-4 py-3.5">
+        <div key={tile.label} className="flex flex-col gap-1 rounded-[13px] border border-line bg-surface px-3.5 py-3 md:gap-1.5 md:px-4 md:py-3.5">
           <dt className="text-[11px] font-medium uppercase tracking-[0.07em] text-faint">{tile.label}</dt>
           <dd className="flex items-baseline gap-2">
-            <span className="font-mono text-[25px] leading-7">{tile.value}</span>
+            <span className="font-mono text-[22px] leading-6 md:text-[25px] md:leading-7">{tile.value}</span>
             {tile.hint && <span className="text-xs text-faint">{tile.hint}</span>}
           </dd>
         </div>

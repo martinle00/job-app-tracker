@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 
-const LINKS = [
+export const LINKS = [
   { href: '/applications', label: 'Table' },
   { href: '/sankey', label: 'Funnel' },
   // Settings is not a view of the data, so it deliberately drops the filters.

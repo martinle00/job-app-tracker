@@ -13,6 +13,7 @@ import { stageColor } from '@/lib/chart-colors';
 import type { ApplicationRow } from '@/lib/queries';
 import { STAGES, isStageId, stageIndex, stageLabel } from '@/lib/stages';
 import { closingStatus, formatDay } from '@/lib/urgency';
+import { ApplicationCard } from './ApplicationCard';
 import { OutcomeBadge } from './StatusBadge';
 
 const columnHelper = createColumnHelper<ApplicationRow>();
@@ -135,7 +136,24 @@ export function ApplicationTable({ rows, selectedId, onSelect }: Props) {
   });
 
   return (
-    <div className="overflow-hidden rounded-card border border-line bg-surface">
+    <>
+      {/* Below md the same rows render as cards — see ApplicationCard. */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {table.getRowModel().rows.map((row) => (
+          <ApplicationCard
+            key={row.id}
+            row={row.original}
+            onSelect={() => onSelect(row.original)}
+          />
+        ))}
+        {rows.length === 0 && (
+          <p className="rounded-card border border-dashed border-[#ded2c1] px-4 py-10 text-center text-[13px] text-faint">
+            No applications match the current filters.
+          </p>
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-card border border-line bg-surface md:block">
       <table className="w-full border-collapse text-[13.5px]">
         <thead className="bg-surface2">
           {table.getHeaderGroups().map((headerGroup) => (
@@ -196,7 +214,8 @@ export function ApplicationTable({ rows, selectedId, onSelect }: Props) {
           )}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }
 
