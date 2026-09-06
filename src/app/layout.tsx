@@ -4,6 +4,7 @@ import './globals.css';
 import { AppShell } from '@/components/AppShell';
 import { getAccent } from '@/lib/settings';
 import { getFilterOptions } from '@/lib/queries';
+import { SheetSync } from '@/components/SheetSync';
 
 export const metadata: Metadata = {
   title: 'Job Application Tracker',
@@ -37,6 +38,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       >
         <Suspense fallback={null}>
           <AppShell people={options.people} sources={options.sources}>
+            {process.env.GOOGLE_SHEETS_ID && <SheetSync />}
             {children}
           </AppShell>
         </Suspense>

@@ -2,7 +2,8 @@
 
 Tracks job applications across several people, as a sortable table and as a
 funnel showing where applications drop out. The data mirrors a Google Sheet,
-which stays the source of truth — the app reads a CSV export of it.
+which stays the source of truth. The app can sync directly from a private
+Google Sheet, or import a CSV export manually.
 
 Next.js 15 (App Router) · Prisma · Tailwind · Postgres (Supabase)
 
@@ -49,6 +50,88 @@ Then open http://localhost:3000.
 
 ## Importing from the sheet
 
+### Automatic Google Sheets sync with Apps Script
+
+An installable Apps Script trigger sends an authenticated HTTP notification to
+the app on edits. The backend rereads the configured sheet and applies the
+validated snapshot in one database transaction.
+
+1. In Google Cloud, enable the **Google Sheets API**, create a service account,
+   and create a JSON key for it. See Google's
+   [service account setup](https://developers.google.com/identity/protocols/oauth2/service-account#creatinganaccount).
+2. Share your spreadsheet with the key's `client_email` as a **Viewer**. The sheet
+   can stay private. The app requests only the
+   [Sheets read-only scope](https://developers.google.com/workspace/sheets/api/scopes).
+3. Set these server environment variables in `.env` locally and in your hosting
+   project's environment settings:
+
+   | Variable | Value |
+   |---|---|
+   | `GOOGLE_SHEETS_ID` | The ID between `/d/` and `/edit` in the spreadsheet URL |
+   | `GOOGLE_SHEETS_RANGE` | A tab and range including headers, e.g. `'Applications'!A:Z` |
+   | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | The JSON key's `client_email` |
+   | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | The JSON key's `private_key`; literal `\n` escapes are supported |
+   | `GOOGLE_SHEETS_WEBHOOK_SECRET` | A strong random secret, also saved in Apps Script |
+
+   Keep credentials out of source control. Restart the dev server or redeploy
+   after setting the variables. No database migration is needed.
+
+4. Deploy the app to a publicly reachable HTTPS URL. In your spreadsheet, open
+   **Extensions > Apps Script** and paste [scripts/google-sheets-trigger.gs](scripts/google-sheets-trigger.gs).
+5. Under **Project Settings > Script Properties**, add:
+
+   | Property | Value |
+   |---|---|
+   | `TRACKER_WEBHOOK_URL` | `https://your-app.example/api/sheets/sync` (the final URL, without redirects) |
+   | `TRACKER_WEBHOOK_SECRET` | The same value as `GOOGLE_SHEETS_WEBHOOK_SECRET` |
+
+6. Run `installTrackerTriggers` once and authorize it. This installs edit,
+   structural-change, and five-minute reconciliation triggers and performs the
+   first sync. Have one owner install the triggers. Re-running setup replaces
+   this integration's triggers for that owner only. No Apps Script web-app
+   deployment is necessary.
+
+Use an **installable** trigger: the simple `onEdit(e)` shown in many examples
+cannot call services requiring authorization, including `UrlFetchApp`. See
+[Google's trigger documentation](https://developers.google.com/apps-script/guides/triggers/installable).
+The script sends a change signal, not cell values. The backend's service account
+still needs Viewer access; webhook authorization and sheet-read authorization
+are separate.
+
+Edits and structural changes initiate a sync even when the app is closed.
+Script/API edits do not fire these triggers, so the five-minute reconciliation
+also catches those changes, formula recalculations, and failed deliveries.
+The script retries transient failures three times and reports failures under
+Apps Script **Executions**. A busy backend returns HTTP 409 so it is retried;
+invalid sheet data returns 422 and leaves the previous snapshot intact.
+
+An open browser checks database sync status every five seconds and refreshes
+the application and funnel views after successful syncs. These checks do not
+read Google Sheets. The status bar shows the last successful sync or an error.
+Delivery depends on Google's trigger scheduling and request duration.
+
+This is **one-way sync from Sheets to the app**. Make lasting application changes
+in the sheet: app edits to managed rows are overwritten, and app-deleted rows
+are restored on the next successful sync. Person aliases and colours set in
+Settings are preserved. Rows match by person/company/role, so changing one of
+those fields replaces the previous managed row. Deleting rows in the sheet
+deletes only applications previously synced from that exact sheet and range;
+unrelated app rows remain. Existing CSV imports with matching keys are adopted
+on first sync. A sheet with valid headers and no data clears its managed rows;
+a completely blank sheet is rejected. Duplicate keys and invalid rows reject
+the whole snapshot. Keep the sheet's dates day-first, as described below.
+
+Use a range covering the whole table, including future rows. Switching the sheet
+ID or range starts separate tracking and retains rows belonging to the old
+source. Clearing `GOOGLE_SHEETS_ID` disables syncing and retains the database.
+
+To verify the connection, run `syncTracker` manually in Apps Script, then edit
+a status cell and confirm that the app's sync timestamp and data update. Test
+an added row and a removed row too. For local testing, Apps Script needs an
+HTTPS tunnel to your dev server; it cannot reach `localhost` directly.
+
+### Manual CSV import
+
 Export the sheet as CSV, then:
 
 ```bash
@@ -76,7 +159,11 @@ fixture in `test/fixtures/sample.csv` is anonymised and committed deliberately.
 | `src/lib/validation.ts` | Zod schemas every write path goes through |
 | `src/lib/filters.ts` | Filter state, parsed from and written to the URL |
 | `src/lib/queries.ts` | Read queries; serialises dates at the client boundary |
-| `src/app/actions.ts` | Server actions — the only writers |
+| `src/app/actions.ts` | Server actions for app edits |
+| `src/lib/google-sheet.ts` | Private Google Sheets reads and snapshot validation |
+| `src/lib/sheet-sync.ts` | Transactional sync and source ownership tracking |
+| `src/app/api/sheets/sync/route.ts` | Authenticated webhook and read-only browser status |
+| `scripts/google-sheets-trigger.gs` | Installable edit/change triggers and reconciliation |
 | `scripts/column-map.ts` | Everything that knows the shape of the exported sheet |
 
 Two conventions worth knowing before changing things:
