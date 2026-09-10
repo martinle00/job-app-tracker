@@ -29,6 +29,7 @@
     "@nivo/sankey": "^0.99.0",
     "@prisma/client": "^6.19.3",
     "@tanstack/react-table": "^8.21.3",
+    "google-auth-library": "^11.0.2",
     "next": "^15.5.25",
     "papaparse": "^5.7.0",
     "react": "^19.2.8",
