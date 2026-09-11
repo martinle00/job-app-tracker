@@ -3,11 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db';
 import { isAccent, setAccent } from '@/lib/settings';
-import {
-  applicationInputSchema,
-  displayPersonName,
-  normalisePersonName,
-} from '@/lib/validation';
+import { displayPersonName, normalisePersonName } from '@/lib/validation';
 
 export type ActionResult =
   | { ok: true }
@@ -22,75 +18,6 @@ function revalidateViews() {
   revalidatePath('/applications');
   revalidatePath('/sankey');
   revalidatePath('/settings');
-}
-
-function toInput(formData: FormData) {
-  return Object.fromEntries(
-    ['person', 'company', 'role', 'source', 'location', 'workType', 'jobUrl', 'appliedDate', 'closingDate', 'lastActivity', 'furthestStage', 'outcome', 'notes'].map(
-      (key) => [key, String(formData.get(key) ?? '')],
-    ),
-  );
-}
-
-export async function saveApplication(
-  id: string | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  const parsed = applicationInputSchema.safeParse(toInput(formData));
-
-  if (!parsed.success) {
-    const flat = parsed.error.flatten();
-    return invalid(flat.formErrors, flat.fieldErrors as Record<string, string[]>);
-  }
-
-  const input = parsed.data;
-  const personKey = normalisePersonName(input.person);
-
-  const person = await prisma.person.upsert({
-    where: { name: personKey },
-    update: {},
-    create: { name: personKey, displayName: displayPersonName(input.person) },
-  });
-
-  const data = {
-    personId: person.id,
-    company: input.company,
-    role: input.role,
-    source: input.source ?? null,
-    location: input.location ?? null,
-    workType: input.workType ?? null,
-    jobUrl: input.jobUrl ?? null,
-    appliedDate: input.appliedDate ?? null,
-    closingDate: input.closingDate ?? null,
-    lastActivity: input.lastActivity ?? null,
-    furthestStage: input.furthestStage,
-    outcome: input.outcome,
-    notes: input.notes ?? null,
-  };
-
-  try {
-    if (id) {
-      await prisma.application.update({ where: { id }, data });
-    } else {
-      await prisma.application.create({ data });
-    }
-  } catch (error) {
-    // The (person, company, role) uniqueness that makes the CSV import
-    // idempotent also catches accidental duplicates entered by hand.
-    if (isUniqueConstraintError(error)) {
-      return invalid(['This person already has a row for that company and role.']);
-    }
-    throw error;
-  }
-
-  revalidateViews();
-  return { ok: true };
-}
-
-export async function deleteApplication(id: string): Promise<ActionResult> {
-  await prisma.application.delete({ where: { id } });
-  revalidateViews();
-  return { ok: true };
 }
 
 /**
@@ -157,13 +84,4 @@ export async function updateAccent(value: string): Promise<ActionResult> {
   await setAccent(value);
   revalidateViews();
   return { ok: true };
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: string }).code === 'P2002'
-  );
 }

@@ -156,10 +156,10 @@ fixture in `test/fixtures/sample.csv` is anonymised and committed deliberately.
 | Path | Role |
 |---|---|
 | `src/lib/stages.ts` | Single source of truth for the stage and outcome vocabulary |
-| `src/lib/validation.ts` | Zod schemas every write path goes through |
+| `src/lib/validation.ts` | Person name normalisation and date parsing shared by sync and Settings |
 | `src/lib/filters.ts` | Filter state, parsed from and written to the URL |
 | `src/lib/queries.ts` | Read queries; serialises dates at the client boundary |
-| `src/app/actions.ts` | Server actions for app edits |
+| `src/app/actions.ts` | Server actions for Settings (person aliases/colours, accent) — the app is read-only for applications |
 | `src/lib/google-sheet.ts` | Private Google Sheets reads and snapshot validation |
 | `src/lib/sheet-sync.ts` | Transactional sync and source ownership tracking |
 | `src/app/api/sheets/sync/route.ts` | Authenticated webhook and read-only browser status |
@@ -172,8 +172,9 @@ Two conventions worth knowing before changing things:
   a filtered view is a shareable link. `FilterSidebar` is the only component that
   writes it.
 - **Stage and outcome are plain strings**, not database enums. Their permitted
-  values are enforced by Zod rather than the database, so validation belongs in
-  `src/lib/validation.ts` and the sheet's vocabulary can grow without a
+  values and consistency (e.g. an outcome must be reachable from its stage) are
+  enforced in application code — `scripts/parse-sheet.ts` for sheet-sourced
+  rows — rather than the database, so the vocabulary can grow without a
   migration.
 
 ## Dates

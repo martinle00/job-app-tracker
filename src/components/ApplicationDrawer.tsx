@@ -1,7 +1,5 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { deleteApplication } from '@/app/actions';
 import { stageColor } from '@/lib/chart-colors';
 import type { ApplicationRow } from '@/lib/queries';
 import { OUTCOMES, STAGES, isStageId, stageIndex } from '@/lib/stages';
@@ -12,8 +10,6 @@ import { OutcomeBadge } from './StatusBadge';
 interface Props {
   row: ApplicationRow;
   onClose: () => void;
-  onEdit: () => void;
-  onDeleted: () => void;
 }
 
 /**
@@ -26,8 +22,8 @@ interface Props {
  * row rather than a move to another page, which is why the list stays visible
  * behind either one.
  */
-export function ApplicationDrawer({ row, onClose, onEdit, onDeleted }: Props) {
-  const body = <DrawerBody row={row} onEdit={onEdit} onDeleted={onDeleted} />;
+export function ApplicationDrawer({ row, onClose }: Props) {
+  const body = <DrawerBody row={row} />;
 
   return (
     <>
@@ -84,27 +80,10 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   );
 }
 
-function DrawerBody({
-  row,
-  onEdit,
-  onDeleted,
-}: {
-  row: ApplicationRow;
-  onEdit: () => void;
-  onDeleted: () => void;
-}) {
+function DrawerBody({ row }: { row: ApplicationRow }) {
   const shortlisted = row.outcome === 'NOT_APPLIED';
   const reached = isStageId(row.furthestStage) ? stageIndex(row.furthestStage) : -1;
   const outcome = OUTCOMES.find((o) => o.id === row.outcome);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [pending, startTransition] = useTransition();
-
-  const confirmDelete = () => {
-    startTransition(async () => {
-      await deleteApplication(row.id);
-      onDeleted();
-    });
-  };
 
   const facts = [
     { label: 'Applied', value: row.appliedDate ? formatDay(row.appliedDate) : 'not sent yet' },
@@ -187,45 +166,6 @@ function DrawerBody({
           <p className="whitespace-pre-line text-[13px] leading-5 text-ink2">{row.notes}</p>
         </div>
       )}
-
-      <div className="mt-auto flex items-center justify-between gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="rounded-[10px] px-4 py-2.5 text-[13.5px] font-medium text-surface"
-          style={{ background: 'var(--accent)' }}
-        >
-          Edit
-        </button>
-
-        {confirmingDelete ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={confirmDelete}
-              disabled={pending}
-              className="rounded-[8px] bg-bad-fg px-2.5 py-1.5 text-[12.5px] font-medium text-surface disabled:opacity-50"
-            >
-              Confirm
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(false)}
-              className="text-[12.5px] text-faint"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="text-[12.5px] text-bad-fg"
-          >
-            Delete
-          </button>
-        )}
-      </div>
     </div>
   );
 }

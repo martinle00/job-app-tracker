@@ -1,6 +1,6 @@
 import { ApplicationsView } from '@/components/ApplicationsView';
 import { parseFilters, type SearchParams } from '@/lib/filters';
-import { getApplications, getFilterOptions, getPeople } from '@/lib/queries';
+import { getApplications, getFilterOptions } from '@/lib/queries';
 import { isStageId, stageIndex } from '@/lib/stages';
 import { closingStatus, daysSince } from '@/lib/urgency';
 
@@ -15,10 +15,9 @@ export default async function ApplicationsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const filters = parseFilters(await searchParams);
-  const [rows, options, people] = await Promise.all([
+  const [rows, options] = await Promise.all([
     getApplications(filters),
     getFilterOptions(),
-    getPeople(),
   ]);
 
   const total = options.people.reduce((sum, person) => sum + person.count, 0);
@@ -43,7 +42,6 @@ export default async function ApplicationsPage({
       rows={rows}
       totalRows={total}
       scope={scope}
-      knownPeople={people}
       stats={
         // Keyed because this tree is built in a server component and handed to
         // a client one; serialising across that boundary loses React's
